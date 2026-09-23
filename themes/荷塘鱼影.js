@@ -252,8 +252,8 @@ var theme = {
   author: '羽鳞君',
   license: '竹林用户专享 · 未经授权禁止使用（含个人使用） © 2026 羽鳞君 保留所有权利',
 
-  // 设计画布：以 512×320 固定尺寸绘制；尺寸与等比缩放由框架统一处理（无需自行适配）
-  design: { w: 512, h: 320 },
+  // 设计画布：正方形基准 480×480（1:1，原 512×320 按 ×0.9375 换算）；尺寸与等比缩放由框架统一处理（无需自行适配）
+  design: { w: 480, h: 480 },
 
   render: function () {
     var particles = '';
@@ -324,7 +324,7 @@ var theme = {
 
     return '' +
     '<style>' +
-    '.lh-scene{position:absolute;top:0;left:0;width:512px;height:320px;' +
+    '.lh-scene{position:absolute;top:0;left:0;width:480px;height:480px;' +
       'border-radius:var(--theme-inner-radius,26px);overflow:hidden;' +
       'background:linear-gradient(175deg,' +
       'hsl(var(--accent-hue,150),28%,calc(86% + var(--accent-lightness-offset,0%))) 0%,' +
@@ -370,15 +370,15 @@ var theme = {
     '.lh-leaf-5 svg{filter:drop-shadow(0 3px 8px hsla(var(--accent-hue,150),45%,25%,0.09)) blur(0.6px)}' +
 
     /* 主叶 — 左上角撑出画面，宽度随容器缩放 */
-    '.lh-leaf-1{width:clamp(280px,25%,420px);top:-15%;left:-5%;animation:lh-sway1 7s ease-in-out infinite alternate;z-index:5}' +
+    '.lh-leaf-1{width:clamp(262px,25%,394px);top:-15%;left:-5%;animation:lh-sway1 7s ease-in-out infinite alternate;z-index:5}' +
     /* 对角呼应 — 右下角 */
-    '.lh-leaf-5{width:clamp(280px,25%,420px);bottom:-10%;right:-5%;animation:lh-sway5 7.5s ease-in-out infinite alternate;animation-delay:-3s;z-index:4;opacity:0.82}' +
+    '.lh-leaf-5{width:clamp(262px,25%,394px);bottom:-10%;right:-5%;animation:lh-sway5 7.5s ease-in-out infinite alternate;animation-delay:-3s;z-index:4;opacity:0.82}' +
 
     '@keyframes lh-sway1{0%{transform:rotate(-3deg) translateY(0)}100%{transform:rotate(3deg) translateY(-3px)}}' +
     '@keyframes lh-sway5{0%{transform:rotate(-3deg)}100%{transform:rotate(2.5deg) translateY(-2px)}}' +
 
     /* 露珠：静态分布在右下角叶面，微颤晃动 */
-    '.lh-dewdrop{position:absolute;width:clamp(8px,2%,13px);height:clamp(9px,2.2%,14px);border-radius:50%;' +
+    '.lh-dewdrop{position:absolute;width:clamp(7.5px,2%,12.2px);height:clamp(8.4px,2.2%,13.1px);border-radius:50%;' +
       'background:radial-gradient(circle at 32% 28%,rgba(255,255,255,0.95) 0%,rgba(255,255,255,0.18) 20%,rgba(255,255,255,0.02) 55%,' +
       'hsla(var(--accent-hue,150),40%,50%,0.25) 78%,hsla(var(--accent-hue,150),30%,30%,0.4) 100%);' +
       'box-shadow:0 1px 2.5px hsla(var(--accent-hue,150),30%,20%,0.22),' +
@@ -398,7 +398,7 @@ var theme = {
       '100%{transform:translate(calc(-50% + 1.5px),calc(-50% + 1.5px)) scale(0.95) rotate(1.5deg)}}' +
 
     /* 水珠：左上角叶心形成 → 沿叶脉滑落 → 叶缘脱离 */
-    '.lh-dewdrop-slide{position:absolute;left:50%;top:50%;width:12px;height:14px;border-radius:50%;' +
+    '.lh-dewdrop-slide{position:absolute;left:50%;top:50%;width:11px;height:13px;border-radius:50%;' +
       'background:radial-gradient(circle at 30% 25%,rgba(255,255,255,0.95) 0%,rgba(255,255,255,0.2) 18%,rgba(255,255,255,0.03) 50%,' +
       'hsla(var(--accent-hue,150),40%,50%,0.25) 75%,hsla(var(--accent-hue,150),30%,30%,0.4) 100%);' +
       'box-shadow:0 1.5px 3px hsla(var(--accent-hue,150),30%,20%,0.25),' +
@@ -410,7 +410,7 @@ var theme = {
     dewdropKF('lh-drop-v3', 3) +
 
     /* 水珠滴落涟漪 — 叶缘触及水面瞬间扩散 */
-    '.lh-drop-ripple{position:absolute;width:14px;height:14px;border-radius:50%;pointer-events:none;z-index:-1;' +
+    '.lh-drop-ripple{position:absolute;width:13px;height:13px;border-radius:50%;pointer-events:none;z-index:-1;' +
       'border:2px solid hsla(var(--accent-hue,150),38%,30%,0.58);' +
       'box-shadow:0 0 7px hsla(var(--accent-hue,150),38%,28%,0.28);' +
       'animation:lh-drop-ripple 6s ease-out infinite}' +
@@ -420,12 +420,12 @@ var theme = {
       '100%{transform:translate(-50%,-50%) scale(4.5);opacity:0}}' +
 
     /* 涟漪内圈 - 明亮紧实 */
-    '.lh-ripple-inner{position:absolute;width:24px;height:24px;margin-left:-12px;margin-top:-12px;border-radius:50%;' +
+    '.lh-ripple-inner{position:absolute;width:22px;height:22px;margin-left:-11px;margin-top:-11px;border-radius:50%;' +
       'border:2px solid hsla(var(--accent-hue,150),52%,calc(48% + var(--accent-lightness-offset,0%)),0.4);' +
       'box-shadow:0 0 6px hsla(var(--accent-hue,150),52%,calc(48% + var(--accent-lightness-offset,0%)),0.1);' +
       'animation:lh-ripple-in ease-out infinite}' +
     /* 涟漪外圈 - 淡而扩散 */
-    '.lh-ripple-outer{position:absolute;width:24px;height:24px;margin-left:-12px;margin-top:-12px;border-radius:50%;' +
+    '.lh-ripple-outer{position:absolute;width:22px;height:22px;margin-left:-11px;margin-top:-11px;border-radius:50%;' +
       'border:1.2px solid hsla(var(--accent-hue,150),52%,calc(48% + var(--accent-lightness-offset,0%)),0.18);' +
       'animation:lh-ripple-out ease-out infinite}' +
 
@@ -448,13 +448,13 @@ var theme = {
       '85%{opacity:0.12}' +
       '100%{top:-10%;transform:translateX(12px);opacity:0}}' +
 
-    '.lh-flower{position:absolute;bottom:12.5%;left:20%;width:34px;z-index:7;' +
+    '.lh-flower{position:absolute;bottom:12.5%;left:20%;width:32px;z-index:7;' +
       'animation:lh-bob 5s ease-in-out infinite alternate;opacity:0.78}' +
     '.lh-flower svg{filter:drop-shadow(0 2px 6px hsla(340,45%,40%,0.15))}' +
 
     '@keyframes lh-bob{0%{transform:translateY(0) rotate(-2deg)}100%{transform:translateY(-3px) rotate(2deg)}}' +
 
-    '.lh-koi{position:absolute;width:clamp(45px,6%,85px);height:clamp(22px,3%,42px);z-index:3;' +
+    '.lh-koi{position:absolute;width:clamp(42px,6%,80px);height:clamp(21px,3%,39px);z-index:3;' +
       'left:-8%;top:88%;' +
       'animation:lh-koi-swim 28s ease-in-out infinite;' +
       'filter:drop-shadow(0 2px 6px rgba(180,30,30,0.15)) blur(0.5px)}' +
@@ -498,7 +498,7 @@ var theme = {
     '}' +
 
     /* 白鲤：从右上追踪红鲤 → 中段绕圈超车 → 继续游向左下 */
-    '.lh-koi-white{position:absolute;width:clamp(40px,5%,78px);height:clamp(20px,2.5%,36px);z-index:3;' +
+    '.lh-koi-white{position:absolute;width:clamp(37px,5%,73px);height:clamp(19px,2.5%,34px);z-index:3;' +
       'left:105%;top:14%;transform:scaleX(-1);' +
       'animation:lh-koi2-swim 28s ease-in-out infinite;animation-delay:8s;' +
       'filter:drop-shadow(0 2px 6px rgba(180,140,50,0.12)) blur(0.4px)}' +
@@ -538,7 +538,7 @@ var theme = {
     '}' +
 
     /* 银鲤：近乎直线 L→R 水平漂移，微起伏，深度 scale 0.88→1.12→0.88 */
-    '.lh-koi-silver{position:absolute;width:clamp(38px,4.5%,70px);height:clamp(18px,2.2%,32px);z-index:2;' +
+    '.lh-koi-silver{position:absolute;width:clamp(36px,4.5%,66px);height:clamp(17px,2.2%,30px);z-index:2;' +
       'left:-8%;top:40%;' +
       'animation:lh-koi3-swim 32s ease-in-out infinite;animation-delay:14s;' +
       'filter:drop-shadow(0 2px 5px rgba(140,190,160,0.12));opacity:0.65}' +
@@ -574,7 +574,7 @@ var theme = {
     '}' +
 
     /* 玄鲤：之字形 3 次急停转向，探索者性格 */
-    '.lh-koi-dark{position:absolute;width:clamp(42px,5%,75px);height:clamp(20px,2.5%,35px);z-index:2;' +
+    '.lh-koi-dark{position:absolute;width:clamp(39px,5%,70px);height:clamp(19px,2.5%,33px);z-index:2;' +
       'left:-8%;top:14%;' +
       'animation:lh-koi4-swim 24s ease-in-out infinite;animation-delay:20s;' +
       'filter:drop-shadow(0 2px 4px rgba(180,160,200,0.1));opacity:0.55}' +
@@ -659,7 +659,7 @@ var theme = {
     '[data-theme-mode="dark"] .lh-flower svg{' +
       'filter:drop-shadow(0 0 12px hsla(45,40%,70%,0.35)) drop-shadow(0 0 30px hsla(45,35%,60%,0.15)) blur(1.2px)}' +
     '[data-theme-mode="dark"] .lh-leaf::after{' +
-      'content:"";position:absolute;width:24px;height:24px;left:50%;top:50%;margin:-12px 0 0 -12px;' +
+      'content:"";position:absolute;width:22px;height:22px;left:50%;top:50%;margin:-11px 0 0 -11px;' +
       'border-radius:50%;background:radial-gradient(circle,hsla(45,45%,80%,0.5) 0%,transparent 75%);' +
       'pointer-events:none;z-index:10;transform:translateY(-30%)}' +
     '[data-theme-mode="dark"] .lh-koi{' +
@@ -720,7 +720,7 @@ var theme = {
   },
 
   init: function (container) {
-    // 尺寸与等比缩放交由框架「设计画布契约」统一处理（design: 512×320），主题无需自行缩放。
+    // 尺寸与等比缩放交由框架「设计画布契约」统一处理（design: 480×480），主题无需自行缩放。
     this._container = container || null;
   },
 
