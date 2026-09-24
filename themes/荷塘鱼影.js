@@ -687,6 +687,9 @@ var theme = {
     '@keyframes lh-ffa{0%,100%{transform:translate(0,0);opacity:0}14%{opacity:0.85;transform:translate(-70px,-50px)}32%{opacity:0.12;transform:translate(40px,20px)}50%{opacity:0.7;transform:translate(-30px,-70px)}66%{opacity:0.1;transform:translate(60px,-15px)}82%{opacity:0.8;transform:translate(-20px,35px)}}' +
     '@keyframes lh-ffb{0%,100%{transform:translate(0,0);opacity:0}12%{opacity:0.7;transform:translate(-50px,35px)}26%{opacity:0.9;transform:translate(45px,-45px)}44%{opacity:0.08;transform:translate(15px,-70px)}60%{opacity:0.75;transform:translate(-60px,-10px)}76%{opacity:0.1;transform:translate(35px,25px)}90%{opacity:0.85;transform:translate(-25px,-40px)}}' +
     '@keyframes lh-ffc{0%,100%{transform:translate(0,0);opacity:0}15%{opacity:0.8;transform:translate(55px,-35px)}30%{opacity:0.1;transform:translate(-35px,-60px)}48%{opacity:0.9;transform:translate(-55px,15px)}64%{opacity:0.12;transform:translate(25px,40px)}80%{opacity:0.7;transform:translate(-45px,-25px)}}' +
+    '@media (prefers-reduced-motion: reduce){' +
+      '.lh-scene *{animation:none !important}' +
+    '}' +
     '</style>' +
 
     '<div class="lh-scene">' +
