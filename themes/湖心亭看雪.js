@@ -21,30 +21,34 @@ var theme = {
 
   render: function () {
     // ── 飘雪：细、疏、慢（"人鸟声俱绝"的静，故全篇无鸟）──
-    // 三条下落曲线按索引轮换，避免所有雪花同轨迹
+    // 三条下落曲线按索引轮换，避免所有雪花同轨迹；x 用黄金比低差异序列铺开，疏而不匀
     var flakes = '';
-    for (var i = 0; i < 28; i++) {
-      var fx = ((i * 137.3) % 930) + 16;
-      var fr = 1.05 + (i % 4) * 0.5;
-      var fdur = 17 + (i % 6) * 3.4;
-      var fdelay = -((i * 2.3) % fdur);
+    var GOLDEN = 0.6180339887;
+    for (var i = 0; i < 44; i++) {
+      var fx = (((i * GOLDEN) % 1) * 930) + 15;
+      var fr = 1.0 + (i % 5) * 0.42;
+      var fdur = 15 + (i % 7) * 3.2;
+      var fdelay = -((i * 2.7) % fdur);
       var variant = i % 3;
       flakes += '<g class="lxt-flake lxt-fall-' + variant + '" style="animation-duration:' +
         fdur.toFixed(1) + 's;animation-delay:' + fdelay.toFixed(1) + 's">' +
         '<circle cx="' + fx.toFixed(1) + '" cy="0" r="' + fr.toFixed(2) + '"/></g>';
     }
 
-    // ── 水波：极淡的横向短纹，缓慢呼吸（"略有层次"）──
+    // ── 水波：极淡的横向短纹，缓慢呼吸；越近越大越长（近大远小 = 纵深） ──
     var ripples = '';
-    for (var j = 0; j < 13; j++) {
-      var ry = 502 + j * 32 + (j % 3) * 7;
-      var rrx = 34 + (j % 5) * 22;
-      var rcx = ((j * 211) % 860) + 60;
-      var rop = 0.11 + (j % 4) * 0.042;
-      ripples += '<ellipse class="lxt-ripple" cx="' + rcx + '" cy="' + ry + '" rx="' + rrx +
-        '" ry="1.15" style="opacity:' + rop.toFixed(2) +
+    var RIPPLE_N = 22;
+    for (var j = 0; j < RIPPLE_N; j++) {
+      var depth = j / (RIPPLE_N - 1);                     // 0=近地平线, 1=画面底部
+      var ry = 500 + depth * 434 + (j % 4) * 5;
+      var rrx = (22 + (j % 5) * 16) * (0.78 + depth * 0.72);
+      var rcx = (((j * GOLDEN) % 1) * 880) + 50;
+      var rop = 0.10 + (j % 4) * 0.038;
+      ripples += '<ellipse class="lxt-ripple" cx="' + rcx.toFixed(1) + '" cy="' + ry.toFixed(1) +
+        '" rx="' + rrx.toFixed(1) +
+        '" ry="' + (1.0 + depth * 0.9).toFixed(2) + '" style="opacity:' + rop.toFixed(2) +
         ';animation-duration:' + (10 + (j % 4) * 2.6).toFixed(1) +
-        's;animation-delay:-' + (j * 1.1).toFixed(1) + 's"/>';
+        's;animation-delay:-' + (j * 7.3 % 12).toFixed(1) + 's"/>';
     }
 
     // ── 星：仅暗色模式显示 ──
@@ -57,6 +61,14 @@ var theme = {
         (2.4 + (s % 4) * 0.9).toFixed(1) + 's;animation-delay:-' + (s * 0.7).toFixed(1) + 's"/>';
     }
 
+    // ── 山脊路径：三道递进（越远越浅），近脊同时用于湖面倒影 ──
+    var ridgeUltra = 'M-20,470 Q90,430 190,418 Q290,406 380,426 Q470,444 560,432 ' +
+      'Q650,420 740,434 Q830,448 920,436 Q950,432 980,438 L980,472 L-20,472 Z';
+    var ridgeFar = 'M-20,470 Q80,442 160,430 Q240,418 320,436 Q400,452 470,444 ' +
+      'Q540,436 610,446 Q680,456 750,440 Q820,424 890,438 Q930,446 980,452 L980,472 L-20,472 Z';
+    var ridgeNear = 'M-20,470 Q60,458 140,450 Q220,442 300,454 Q380,464 450,458 ' +
+      'Q520,452 590,460 Q660,468 730,458 Q800,448 870,456 Q930,462 980,466 L980,472 L-20,472 Z';
+
     return '' +
     '<style>' +
     /* ── 调色（昼雪 / 夜雪双模；一律由 --accent-hue 派生，与平台配色联动） ── */
@@ -67,6 +79,7 @@ var theme = {
       '--sky-bottom:hsl(var(--bh),22%,calc(95% + var(--alo)));' +
       '--water-far:hsl(var(--bh),24%,calc(93% + var(--alo)));' +
       '--water-near:hsl(var(--bh),28%,calc(85% + var(--alo)));' +
+      '--mt-ultra:hsl(var(--bh),18%,calc(91% + var(--alo)));' +
       '--mt-far:hsl(var(--bh),20%,calc(87% + var(--alo)));' +
       '--mt-near:hsl(var(--bh),23%,calc(80% + var(--alo)));' +
       '--ink:hsl(var(--bh),26%,calc(34% + var(--alo)));' +
@@ -89,6 +102,7 @@ var theme = {
       '--sky-bottom:hsl(var(--bh),30%,calc(15% + var(--alo)));' +
       '--water-far:hsl(var(--bh),28%,calc(14% + var(--alo)));' +
       '--water-near:hsl(var(--bh),26%,calc(8% + var(--alo)));' +
+      '--mt-ultra:hsl(var(--bh),26%,calc(29% + var(--alo)));' +
       '--mt-far:hsl(var(--bh),26%,calc(23% + var(--alo)));' +
       '--mt-near:hsl(var(--bh),26%,calc(18% + var(--alo)));' +
       '--ink:hsl(var(--bh),30%,calc(3% + var(--alo)));' +
@@ -105,11 +119,11 @@ var theme = {
     '.lxt-fall-b{animation-name:lxt-fall-b}' +
     '.lxt-fall-c{animation-name:lxt-fall-c}' +
     '@keyframes lxt-fall-a{0%{transform:translate(0,-30px);opacity:0}' +
-      '8%{opacity:.75}88%{opacity:.5}100%{transform:translate(14px,990px);opacity:0}}' +
+      '8%{opacity:.88}88%{opacity:.6}100%{transform:translate(14px,990px);opacity:0}}' +
     '@keyframes lxt-fall-b{0%{transform:translate(0,-30px);opacity:0}' +
-      '10%{opacity:.7}86%{opacity:.45}100%{transform:translate(-26px,990px);opacity:0}}' +
+      '10%{opacity:.82}86%{opacity:.55}100%{transform:translate(-26px,990px);opacity:0}}' +
     '@keyframes lxt-fall-c{0%{transform:translate(0,-30px);opacity:0}' +
-      '6%{opacity:.8}90%{opacity:.55}100%{transform:translate(34px,990px);opacity:0}}' +
+      '6%{opacity:.92}90%{opacity:.65}100%{transform:translate(34px,990px);opacity:0}}' +
 
     /* ── 星闪（仅暗色） ── */
     '.lxt-star{display:none;opacity:.7}' +
@@ -204,23 +218,27 @@ var theme = {
       '<rect x="0" y="0" width="960" height="482" fill="url(#lxtSky)"/>' +
       stars +
 
-      /* 远山：只留极淡的两道轮廓（天与山与水上下一白） */
-      '<g filter="url(#lxtBlurSoft)" opacity="0.72">' +
-        '<path d="M-20,470 Q80,442 160,430 Q240,418 320,436 Q400,452 470,444 ' +
-          'Q540,436 610,446 Q680,456 750,440 Q820,424 890,438 Q930,446 980,452 L980,472 L-20,472 Z" ' +
-          'fill="var(--mt-far)"/>' +
+      /* 远山：三道极淡轮廓，越远越浅（天与山与水上下一白） */
+      '<g filter="url(#lxtBlurSoft)" opacity="0.5">' +
+        '<path d="' + ridgeUltra + '" fill="var(--mt-ultra)"/>' +
       '</g>' +
-      '<g filter="url(#lxtBlurMid)" opacity="0.8">' +
-        '<path d="M-20,470 Q60,458 140,450 Q220,442 300,454 Q380,464 450,458 ' +
-          'Q520,452 590,460 Q660,468 730,458 Q800,448 870,456 Q930,462 980,466 L980,472 L-20,472 Z" ' +
-          'fill="var(--mt-near)"/>' +
+      '<g filter="url(#lxtBlurSoft)" opacity="0.72">' +
+        '<path d="' + ridgeFar + '" fill="var(--mt-far)"/>' +
+      '</g>' +
+      '<g filter="url(#lxtBlurMid)" opacity="0.82">' +
+        '<path d="' + ridgeNear + '" fill="var(--mt-near)"/>' +
       '</g>' +
 
       /* 水面 */
       '<rect x="0" y="470" width="960" height="490" fill="url(#lxtWater)"/>' +
+      /* 山影倒影：把近脊沿湖面翻转（y -> 940 - y），极淡且更模糊 → 读出"这是湖" */
+      '<g filter="url(#lxtBlurSoft)" opacity="0.26" transform="translate(0,940) scale(1,-1)">' +
+        '<path d="' + ridgeNear + '" fill="var(--mt-near)"/>' +
+      '</g>' +
 
-      /* 长堤一痕：极淡的一道楔形墨痕，向右收束于湖心亭方向 */
+      /* 长堤一痕：远堤（更淡）/ 主堤 两道楔形墨痕，向右收束于湖心亭方向 */
       '<g class="lxt-causeway" filter="url(#lxtBlurSoft)">' +
+        '<path d="M-10,487 L524,481 L524,484.5 L-10,491 Z" fill="var(--ink)" opacity="0.12"/>' +
         '<path d="M-10,503 L586,494 L586,499 L-10,511 Z" fill="var(--ink)" opacity="0.22"/>' +
         '<circle cx="96" cy="504" r="1.5" fill="var(--ink)" opacity="0.3"/>' +
         '<circle cx="214" cy="502" r="1.4" fill="var(--ink)" opacity="0.28"/>' +
@@ -231,25 +249,25 @@ var theme = {
       /* 雾凇沆砀：地平线大气带，把远山/长堤"沆砀"掉 */
       '<rect x="0" y="330" width="960" height="300" fill="url(#lxtHorizon)"/>' +
 
-      /* 湖心亭一点 */
+      /* 湖心亭一点（放大到 scale 1.55，兼顾"一点"的克制与可读性） */
       '<g transform="translate(600,470)">' +
-        '<ellipse cx="0" cy="1.5" rx="22" ry="3.4" fill="var(--ink)" opacity="0.4" ' +
+        '<ellipse cx="0" cy="2" rx="27" ry="4.2" fill="var(--ink)" opacity="0.4" ' +
           'filter="url(#lxtBlurMid)"/>' +
-        '<g transform="scale(1.25)">' +
+        '<g transform="scale(1.55)">' +
           '<path d="M-14,-12 Q-7,-17 0,-23 Q7,-17 14,-12 Q7,-14 0,-13.4 Q-7,-14 -14,-12 Z" ' +
-            'fill="var(--ink)" opacity="0.72"/>' +
-          '<line x1="-9" y1="-12.5" x2="-9" y2="-1" stroke="var(--ink)" stroke-width="1.1" opacity="0.66"/>' +
-          '<line x1="9" y1="-12.5" x2="9" y2="-1" stroke="var(--ink)" stroke-width="1.1" opacity="0.66"/>' +
-          '<line x1="-12.5" y1="-12.4" x2="12.5" y2="-12.4" stroke="var(--ink)" stroke-width="0.9" opacity="0.5"/>' +
+            'fill="var(--ink)" opacity="0.74"/>' +
+          '<line x1="-9" y1="-12.5" x2="-9" y2="-1" stroke="var(--ink)" stroke-width="1" opacity="0.68"/>' +
+          '<line x1="9" y1="-12.5" x2="9" y2="-1" stroke="var(--ink)" stroke-width="1" opacity="0.68"/>' +
+          '<line x1="-12.5" y1="-12.4" x2="12.5" y2="-12.4" stroke="var(--ink)" stroke-width="0.8" opacity="0.5"/>' +
           '<rect x="-13" y="-1.6" width="26" height="1.8" fill="var(--ink)" opacity="0.55"/>' +
         '</g>' +
         /* 亭中炉火：全画面唯一的暖点 */
-        '<ellipse class="lxt-lamp-glow" cx="0" cy="-9" rx="17" ry="12" fill="url(#lxtLampGlow)"/>' +
-        '<circle class="lxt-lamp" cx="0" cy="-8.5" r="2" fill="var(--lamp)"/>' +
-        /* 湖面暖光倒影 */
-        '<ellipse cx="0" cy="10" rx="15" ry="7" fill="var(--lamp-glow)" opacity="0.1" ' +
+        '<ellipse class="lxt-lamp-glow" cx="0" cy="-11" rx="22" ry="15" fill="url(#lxtLampGlow)"/>' +
+        '<circle class="lxt-lamp" cx="0" cy="-10.5" r="2.6" fill="var(--lamp)"/>' +
+        /* 湖面暖光倒影 / 岛影 */
+        '<ellipse cx="0" cy="11" rx="19" ry="8.5" fill="var(--lamp-glow)" opacity="0.11" ' +
           'filter="url(#lxtBlurSoft)"/>' +
-        '<ellipse cx="0" cy="5.5" rx="19" ry="2.4" fill="var(--ink)" opacity="0.13" ' +
+        '<ellipse cx="0" cy="6" rx="24" ry="2.8" fill="var(--ink)" opacity="0.13" ' +
           'filter="url(#lxtBlurMid)"/>' +
       '</g>' +
 
@@ -262,16 +280,19 @@ var theme = {
       '<g transform="translate(0,742)">' +
         '<g class="lxt-boat-track">' +
           '<g class="lxt-boat-bob">' +
-            '<line class="lxt-oar" x1="8" y1="-2" x2="-2" y2="7" stroke="var(--ink)" ' +
-              'stroke-width="0.9" stroke-linecap="round" opacity="0.45"/>' +
-            '<path d="M-19,-1.5 Q0,7 19,-1.5 Q0,2.5 -19,-1.5 Z" fill="var(--ink)" opacity="0.66"/>' +
-            '<path d="M-7,-1.6 Q-1,-9 5,-1.6 Z" fill="var(--ink)" opacity="0.72"/>' +
-            /* 舟中人两三粒 */
-            '<circle cx="9.5" cy="-4" r="1.9" fill="var(--ink)" opacity="0.6"/>' +
-            '<circle cx="13.2" cy="-3.4" r="1.5" fill="var(--ink)" opacity="0.5"/>' +
-            /* 舟中炉火 */
-            '<ellipse class="lxt-lamp-glow" cx="-1" cy="-4" rx="8" ry="6" fill="url(#lxtLampGlow)"/>' +
-            '<circle class="lxt-lamp" cx="-1" cy="-4" r="1.3" fill="var(--lamp)" opacity="0.9"/>' +
+            /* 放大 1.4：近景之物，尺度上略大于亭，读得出"余舟一芥" */
+            '<g transform="scale(1.4)">' +
+              '<line class="lxt-oar" x1="8" y1="-2" x2="-2" y2="7" stroke="var(--ink)" ' +
+                'stroke-width="0.9" stroke-linecap="round" opacity="0.45"/>' +
+              '<path d="M-19,-1.5 Q0,7 19,-1.5 Q0,2.5 -19,-1.5 Z" fill="var(--ink)" opacity="0.68"/>' +
+              '<path d="M-7,-1.6 Q-1,-9 5,-1.6 Z" fill="var(--ink)" opacity="0.74"/>' +
+              /* 舟中人两三粒 */
+              '<circle cx="9.5" cy="-4" r="1.9" fill="var(--ink)" opacity="0.62"/>' +
+              '<circle cx="13.2" cy="-3.4" r="1.5" fill="var(--ink)" opacity="0.52"/>' +
+              /* 舟中炉火 */
+              '<ellipse class="lxt-lamp-glow" cx="-1" cy="-4" rx="9" ry="6.5" fill="url(#lxtLampGlow)"/>' +
+              '<circle class="lxt-lamp" cx="-1" cy="-4" r="1.6" fill="var(--lamp)" opacity="0.92"/>' +
+            '</g>' +
           '</g>' +
         '</g>' +
       '</g>' +
