@@ -136,115 +136,382 @@ function waveLayerSVG(id, opacity) {
   return '<svg viewBox="0 0 ' + w + ' 120" preserveAspectRatio="none" style="width:200%;height:100%">' + paths + '</svg>';
 }
 
-function koiFishSVG() {
-  return '<svg viewBox="0 0 80 40" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%">' +
+/* ═══════════════════════════════════════════════════════════════════
+   锦鲤运动学模型（三条时间尺度解耦）
+   A 轨迹层：样条路径 + 冲滑速度剖面 → CSS motion path。浏览器按真实切线
+              定向，姿态天然贴合；offset-distance 沿弧长线性插值，密采样
+              只用于编码速度，不存在「折线抄近道」问题。
+   B 身段层：体廓横截面叠加「振幅向后递增 + 相位向后滞后」的侧向行波，
+              用 CSS 动画插值 SVG d 属性直接形变体廓——头稳尾摆的真行波，
+              而非整只鱼一起剪切的刚体。
+   C 附肢层：尾鳍绕尾柄旋转且相位再滞后；胸鳍独立扇动（与摆尾非同频）。
+   ═══════════════════════════════════════════════════════════════════ */
+
+// 数值压缩：去掉前导 0 与多余小数位（SVG path 与 CSS 均接受 .5 写法）
+function kn(v) {
+  var s = (Math.round(v * 100) / 100).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  return s.replace(/^(-?)0\./, '$1.');
+}
+
+// Catmull-Rom 转三次贝塞尔：得到过点平滑曲线；各帧命令结构完全一致，d 才能插值
+function koiSmooth(pts) {
+  var d = '';
+  for (var i = 0; i < pts.length - 1; i++) {
+    var p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || pts[i + 1];
+    d += 'C' + kn(p1[0] + (p2[0] - p0[0]) / 6) + ',' + kn(p1[1] + (p2[1] - p0[1]) / 6) + ' ' +
+      kn(p2[0] - (p3[0] - p1[0]) / 6) + ',' + kn(p2[1] - (p3[1] - p1[1]) / 6) + ' ' +
+      kn(p2[0]) + ',' + kn(p2[1]) + ' ';
+  }
+  return d;
+}
+
+// 体型剖面：[体轴 x, 上缘半高, 下缘半高]
+// 数值直接取自原手绘体廓（M22,-1 Q8,-8 -6,-9 Q-20,-5 -28,-1 …）的采样点，
+// 因此叠加行波后仍是同一条写意鱼——只是这条鱼现在会弯了。
+function koiProfile() {
+  return [[22, 1, 1], [15, 4.1, 3.7], [8, 6.5, 5.8], [1, 8.1, 7.2], [-6, 9, 8],
+    [-12.6, 7, 6.1], [-18.5, 5, 4.3], [-23.6, 3, 2.6], [-28, 1, 1]];
+}
+
+// 侧向行波：振幅沿体轴向后递增、相位向后滞后 → 真行波（头稳尾摆）
+// 指数取 1.7 而非 2：增长更缓，避免体廓在 1/3 体长处出现折角
+function koiWave(u, p, o) {
+  var A = o.amp * (0.12 + 0.88 * Math.pow(u, 1.7));
+  return A * Math.sin(2 * Math.PI * (u / o.lam - p) + o.phi);
+}
+
+// 由体轴 x 反查行波参数 u（背鳍等挂点用）
+function koiUAt(x, prof) {
+  for (var i = 0; i < prof.length - 1; i++) {
+    if (x >= prof[i + 1][0]) {
+      var span = prof[i][0] - prof[i + 1][0] || 1;
+      return (i + (prof[i][0] - x) / span) / (prof.length - 1);
+    }
+  }
+  return 1;
+}
+
+// 体廓 + 背鳍子路径（背鳍基部略沉入体内，形变时不会露缝）
+// 坐标系即 SVG 用户坐标：脊线 y=0、吻端 x=+22、尾柄 x=-27、尾鳍尖 x=-45
+function koiFleshD(p, o) {
+  var prof = o.prof, top = [], bot = [], i, u, x, dy;
+  for (i = 0; i < prof.length; i++) {
+    u = i / (prof.length - 1);
+    x = prof[i][0];
+    dy = koiWave(u, p, o);
+    top.push([x, -prof[i][1] + dy]);
+    bot.push([x, prof[i][2] + dy]);
+  }
+  var d = 'M' + kn(top[0][0]) + ',' + kn(top[0][1]) + ' ' + koiSmooth(top) +
+    'L' + kn(bot[bot.length - 1][0]) + ',' + kn(bot[bot.length - 1][1]) + ' ' +
+    koiSmooth(bot.reverse()) + 'Z';
+  var fin = '';
+  for (i = 0; i < o.fin.length; i++) {
+    x = o.fin[i][0];
+    dy = koiWave(koiUAt(x, prof), p, o);
+    fin += (i ? 'L' : 'M') + kn(x) + ',' + kn(o.fin[i][1] + dy);
+  }
+  return d + ' ' + fin + 'Z';
+}
+
+// 体色：g 体长三色 / fin 鳍色 / fin2 鳍端色 / hl 脊背高光 / sh 两胁暗部
+//       ray 鳍射线与鳃盖线 / patch 斑纹
+function koiPalettes() {
+  return {
+    red: { g: ['#d64545', '#c43030', '#a01818'], fin: '#d64545', fin2: '#e8736b',
+      hl: 'rgba(255,235,225,0.26)', sh: 'rgba(72,4,4,0.17)', ray: 'rgba(255,226,216,0.5)', patch: 'rgba(255,245,240,0.14)' },
+    white: { g: ['#f5d060', '#e8c040', '#c89820'], fin: '#e8c040', fin2: '#f5e08a',
+      hl: 'rgba(255,255,238,0.3)', sh: 'rgba(84,52,4,0.17)', ray: 'rgba(255,248,214,0.55)', patch: 'rgba(255,252,236,0.18)' },
+    silver: { g: ['#b4e2d6', '#86c4ad', '#5f9e88'], fin: '#8cc8b0', fin2: '#b8e0d0',
+      hl: 'rgba(255,255,255,0.3)', sh: 'rgba(22,62,52,0.17)', ray: 'rgba(240,255,250,0.5)', patch: 'rgba(255,255,255,0.2)' },
+    dark: { g: ['#dbcce8', '#b2a2c6', '#8b7aa4'], fin: '#b2a2c6', fin2: '#cdbfe0',
+      hl: 'rgba(250,245,255,0.28)', sh: 'rgba(44,24,64,0.17)', ray: 'rgba(245,238,255,0.45)', patch: 'rgba(255,255,255,0.13)' }
+  };
+}
+
+// 尾鳍射线：沿上下叶外缘按比例取目标点，自尾柄发散（两端留白，成鳍条感）
+function koiCubic(p0, p1, p2, p3, t) {
+  var k = 1 - t;
+  return [k * k * k * p0[0] + 3 * k * k * t * p1[0] + 3 * k * t * t * p2[0] + t * t * t * p3[0],
+    k * k * k * p0[1] + 3 * k * k * t * p1[1] + 3 * k * t * t * p2[1] + t * t * t * p3[1]];
+}
+
+function koiTailRays() {
+  var lobes = [
+    [[-26, -1.6], [-30, -6], [-37, -12], [-43.5, -11.5]],
+    [[-26, 1.6], [-30, 6], [-37, 12], [-43.5, 11.5]]
+  ];
+  var d = '';
+  for (var e = 0; e < 2; e++) {
+    var c = lobes[e], root = c[0];
+    for (var k = 1; k <= 4; k++) {
+      var tip = koiCubic(c[0], c[1], c[2], c[3], k / 4.7);
+      d += 'M' + kn(root[0] + (tip[0] - root[0]) * 0.2) + ',' + kn(root[1] + (tip[1] - root[1]) * 0.2) +
+        'L' + kn(root[0] + (tip[0] - root[0]) * 0.84) + ',' + kn(root[1] + (tip[1] - root[1]) * 0.84) + ' ';
+    }
+  }
+  return d;
+}
+
+// 单条鱼 SVG：三层结构
+//   ① 底色层 kh-f：沿体长渐变，承「尾亮头深」的颜色识别
+//   ② 体量层 kh-v：与底色层共用同一份 d 动画（同一个 @keyframes，不额外增加关键帧），
+//      以 objectBoundingBox 竖向渐变压暗两胁、提亮脊背 → 圆背体积感；渐变随包围盒走，
+//      所以鱼身弯成 S 时高光仍在体轴中线上
+//   ③ 附肢层：尾鳍（单块深分叉扇形 + 鳍条射线 + 叶根辐射渐变）、胸鳍（半透明叶形）、
+//      鳃盖弧、斑纹（有机形状而非椭圆，贴脊背不触边）
+// 写意俯视鱼：左右对称、无眼；朝向由「尾鳍分叉在后、体廓收窄在前」读出。
+function koiSVG(id, pal, o) {
+  var flesh = koiFleshD(0, o);
+  /* 尾鳍：一块连续深分叉扇形；叶根前伸 2 单位埋进体内，
+     且整组绘制在体廓之后 —— 无论怎么侧移/旋转，接缝都被身体盖住，绝不脱节 */
+  var tail = 'M-26,-1.6 C-30,-6 -37,-12 -43.5,-11.5 ' +
+    'C-41.2,-7.5 -38.2,-3.4 -36.2,-0.5 C-38.2,3.4 -41.2,7.5 -43.5,11.5 ' +
+    'C-37,12 -30,6 -26,1.6 Z';
+  /* 胸鳍：根部同样埋进体内 1 单位以上，绘制在体廓之后 */
+  var pector = function (s) {
+    return 'M15.4,' + kn(s * 3) + ' C12.4,' + kn(s * 6.4) + ' 9.6,' + kn(s * 9.6) + ' 8.4,' + kn(s * 11.8) +
+      ' C11.8,' + kn(s * 11.2) + ' 14.2,' + kn(s * 8.2) + ' 13.6,' + kn(s * 4.4) + ' Z';
+  };
+  return '<svg viewBox="' + o.vb + '" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%">' +
     '<defs>' +
-      '<linearGradient id="koiBody" x1="0%" y1="0%" x2="100%" y2="20%">' +
-        '<stop offset="0%" stop-color="#d64545" />' +
-        '<stop offset="45%" stop-color="#c43030" />' +
-        '<stop offset="100%" stop-color="#a01818" />' +
+      /* 体色沿体长：userSpaceOnUse 只沿体轴 → 形变不会在背鳍基部弦线上留色差缝 */
+      '<linearGradient id="kb' + id + '" gradientUnits="userSpaceOnUse" x1="-45" y1="0" x2="22" y2="0">' +
+        '<stop offset="0%" stop-color="' + pal.g[0] + '" />' +
+        '<stop offset="45%" stop-color="' + pal.g[1] + '" />' +
+        '<stop offset="100%" stop-color="' + pal.g[2] + '" />' +
+      '</linearGradient>' +
+      /* 体量：两胁压暗 → 中段透明 → 脊背提亮 */
+      '<linearGradient id="kv' + id + '" x1="0%" y1="0%" x2="0%" y2="100%">' +
+        '<stop offset="0%" stop-color="' + pal.sh + '" />' +
+        '<stop offset="20%" stop-color="' + pal.sh + '" stop-opacity="0" />' +
+        '<stop offset="50%" stop-color="' + pal.hl + '" />' +
+        '<stop offset="80%" stop-color="' + pal.sh + '" stop-opacity="0" />' +
+        '<stop offset="100%" stop-color="' + pal.sh + '" />' +
+      '</linearGradient>' +
+      /* 尾鳍：叶根实、叶缘淡（尾鳍组只平移旋转，坐标系稳定，可用 userSpaceOnUse） */
+      '<radialGradient id="kt' + id + '" gradientUnits="userSpaceOnUse" cx="-27" cy="0" r="18">' +
+        '<stop offset="0%" stop-color="' + pal.fin + '" stop-opacity="0.88" />' +
+        '<stop offset="55%" stop-color="' + pal.fin + '" stop-opacity="0.72" />' +
+        '<stop offset="100%" stop-color="' + pal.fin2 + '" stop-opacity="0.44" />' +
+      '</radialGradient>' +
+      /* 胸鳍：根实端淡（objectBoundingBox → 上下两鳍自动同向渐变） */
+      '<linearGradient id="kp' + id + '" x1="100%" y1="50%" x2="0%" y2="50%">' +
+        '<stop offset="0%" stop-color="' + pal.fin2 + '" stop-opacity="0.78" />' +
+        '<stop offset="100%" stop-color="' + pal.fin2 + '" stop-opacity="0.34" />' +
       '</linearGradient>' +
     '</defs>' +
-    '<g transform="translate(40,20)">' +
-      /* 梭形身体 */
-      '<path d="M22,-1 Q8,-8 -6,-9 Q-20,-5 -28,-1 Q-20,4 -6,8 Q8,7 22,1 Q14,0 22,-1 Z" fill="url(#koiBody)" />' +
-      /* 分叉尾鳍 - 上叶 */
-      '<path d="M-26,-1 C-30,-4 -38,-11 -45,-9 C-38,-5 -31,-2 -26,-1 Z" fill="#d64545" opacity="0.75" />' +
-      /* 分叉尾鳍 - 下叶 */
-      '<path d="M-26,-1 C-30,2 -38,9 -45,7 C-38,4 -31,1 -26,-1 Z" fill="#d64545" opacity="0.7" />' +
-      /* 尾鳍脉络 */
-      '<path d="M-26,-1 Q-35,-6 -45,-9" stroke="rgba(255,255,255,0.1)" stroke-width="0.5" fill="none" />' +
-      '<path d="M-26,-1 Q-35,4 -45,7" stroke="rgba(255,255,255,0.1)" stroke-width="0.5" fill="none" />' +
-      /* 背鳍 */
-      '<path d="M-2,-8.5 Q-6,-13 -3,-14 Q1,-12 3,-9 Z" fill="#e86060" opacity="0.7" />' +
-      /* 胸鳍 */
-      '<path d="M12,5 Q8,12 10,13 Q14,10 14,6 Z" fill="#e86060" opacity="0.6" />' +
-      '<path d="M12,-5 Q8,-11 10,-12 Q14,-9 14,-6 Z" fill="#e86060" opacity="0.6" />' +
-      /* 身体轮廓线 */
-      '<path d="M22,-1 Q8,-8 -6,-9 Q-20,-5 -28,-1 Q-20,4 -6,8 Q8,7 22,1 Q14,0 22,-1 Z" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="0.8" />' +
-      /* 自然斑纹 */
-      '<ellipse cx="2" cy="-2" rx="10" ry="4.5" fill="rgba(255,255,255,0.22)" transform="rotate(-6 2 -2)" />' +
-      '<ellipse cx="-12" cy="1" rx="7" ry="3" fill="rgba(255,255,255,0.16)" transform="rotate(3 -12 1)" />' +
-      '<ellipse cx="-20" cy="-1" rx="4" ry="2" fill="rgba(255,255,255,0.12)" />' +
-      /* 侧线 */
-      '<path d="M-18,-0.5 Q-2,-2.5 16,-0.5" stroke="rgba(255,255,255,0.18)" stroke-width="0.5" fill="none" />' +
+    '<g class="kh-t' + id + '">' +
+      '<path d="' + tail + '" fill="url(#kt' + id + ')" />' +
+      '<path d="' + koiTailRays() + '" stroke="' + pal.ray + '" stroke-width="0.45" fill="none" opacity="0.4" />' +
+    '</g>' +
+    '<g class="kh-p1' + id + '"><path d="' + pector(-1) + '" fill="url(#kp' + id + ')" /></g>' +
+    '<g class="kh-p2' + id + '"><path d="' + pector(1) + '" fill="url(#kp' + id + ')" /></g>' +
+    '<path class="kh-f' + id + '" d="' + flesh + '" fill="url(#kb' + id + ')" />' +
+    '<path class="kh-v' + id + '" d="' + flesh + '" fill="url(#kv' + id + ')" />' +
+    '<g class="kh-m' + id + '">' +
+      /* 鳃盖：头后一道弧 */
+      '<path d="M11.4,-4 C14,-1.4 14,1.4 11.4,4" stroke="' + pal.ray + '" stroke-width="0.6" fill="none" opacity="0.28" />' +
+      /* 白斑：分置两侧不对称（避开中线的脊背高光，否则叠加成一片白雾），
+         位置也贴近真实锦鲤的斑型 */
+      '<ellipse cx="2.6" cy="-3.6" rx="6.2" ry="2.2" fill="' + pal.patch + '" transform="rotate(-8 2.6 -3.6)" />' +
+      '<ellipse cx="-9.6" cy="2.9" rx="4.6" ry="1.8" fill="' + pal.patch + '" opacity="0.85" transform="rotate(6 -9.6 2.9)" />' +
+      /* 脊背鳞光 */
+      '<path d="M-20,-0.4 Q-2,-1.5 17,-0.5" stroke="' + pal.ray + '" stroke-width="0.45" fill="none" opacity="0.4" />' +
     '</g>' +
   '</svg>';
 }
 
-function koiWhiteSVG() {
-  return '<svg viewBox="0 0 80 40" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%">' +
-    '<defs>' +
-      '<linearGradient id="koiWhiteBody" x1="0%" y1="0%" x2="100%" y2="20%">' +
-        '<stop offset="0%" stop-color="#f5d060" />' +
-        '<stop offset="50%" stop-color="#e8c040" />' +
-        '<stop offset="100%" stop-color="#c89820" />' +
-      '</linearGradient>' +
-    '</defs>' +
-    '<g transform="translate(40,20)">' +
-      '<path d="M22,-1 Q8,-8 -6,-9 Q-20,-5 -28,-1 Q-20,4 -6,8 Q8,7 22,1 Q14,0 22,-1 Z" fill="url(#koiWhiteBody)" />' +
-      '<path d="M-26,-1 C-30,-4 -38,-11 -45,-9 C-38,-5 -31,-2 -26,-1 Z" fill="#e8c040" opacity="0.7" />' +
-      '<path d="M-26,-1 C-30,2 -38,9 -45,7 C-38,4 -31,1 -26,-1 Z" fill="#e8c040" opacity="0.65" />' +
-      '<path d="M-26,-1 Q-35,-6 -45,-9" stroke="rgba(180,140,60,0.15)" stroke-width="0.5" fill="none" />' +
-      '<path d="M-26,-1 Q-35,4 -45,7" stroke="rgba(180,140,60,0.15)" stroke-width="0.5" fill="none" />' +
-      '<path d="M-2,-8.5 Q-6,-13 -3,-14 Q1,-12 3,-9 Z" fill="#f0d870" opacity="0.7" />' +
-      '<path d="M12,5 Q8,12 10,13 Q14,10 14,6 Z" fill="#f0d870" opacity="0.55" />' +
-      '<path d="M12,-5 Q8,-11 10,-12 Q14,-9 14,-6 Z" fill="#f0d870" opacity="0.55" />' +
-      '<path d="M22,-1 Q8,-8 -6,-9 Q-20,-5 -28,-1 Q-20,4 -6,8 Q8,7 22,1 Q14,0 22,-1 Z" fill="none" stroke="rgba(180,140,60,0.2)" stroke-width="0.8" />' +
-      '<ellipse cx="2" cy="2" rx="8" ry="3.5" fill="rgba(255,240,200,0.2)" transform="rotate(5 2 2)" />' +
-      '<path d="M-18,-0.5 Q-2,-2.5 16,-0.5" stroke="rgba(180,140,60,0.15)" stroke-width="0.5" fill="none" />' +
-    '</g>' +
-  '</svg>';
+// 胸鳍扇动：绕鳍根小幅摆动，周期与摆尾错开（0.72 倍）→ 避免机械同步
+// sign 同时决定枢轴所在侧（p1 在体轴负侧）与摆向，两鳍因而天然镜像
+function koiPectKF(name, o, sign) {
+  var p = 'transform:translate(14.5px,' + kn(sign * 3.7) + 'px) rotate(';
+  var q = 'deg) translate(-14.5px,' + kn(-sign * 3.7) + 'px)';
+  return '@keyframes ' + name + '{' +
+    '0%{' + p + kn(sign * 8) + q + '}' +
+    '50%{' + p + kn(-sign * 3) + q + '}' +
+    '100%{' + p + kn(sign * 8) + q + '}' +
+  '}';
 }
 
-function koiSilverSVG() {
-  return '<svg viewBox="0 0 80 40" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%">' +
-    '<defs>' +
-      '<linearGradient id="koiSilverBody" x1="0%" y1="0%" x2="100%" y2="20%">' +
-        '<stop offset="0%" stop-color="#c8e8e0" />' +
-        '<stop offset="40%" stop-color="#a0d0c0" />' +
-        '<stop offset="100%" stop-color="#78b8a0" />' +
-      '</linearGradient>' +
-    '</defs>' +
-    '<g transform="translate(40,20)">' +
-      '<path d="M22,-1 Q8,-8 -6,-9 Q-20,-5 -28,-1 Q-20,4 -6,8 Q8,7 22,1 Q14,0 22,-1 Z" fill="url(#koiSilverBody)" />' +
-      '<path d="M-26,-1 C-30,-4 -38,-11 -45,-9 C-38,-5 -31,-2 -26,-1 Z" fill="#a0d0c0" opacity="0.7" />' +
-      '<path d="M-26,-1 C-30,2 -38,9 -45,7 C-38,4 -31,1 -26,-1 Z" fill="#a0d0c0" opacity="0.65" />' +
-      '<path d="M-26,-1 Q-35,-6 -45,-9" stroke="rgba(255,255,255,0.2)" stroke-width="0.5" fill="none" />' +
-      '<path d="M-26,-1 Q-35,4 -45,7" stroke="rgba(255,255,255,0.2)" stroke-width="0.5" fill="none" />' +
-      '<path d="M-2,-8.5 Q-6,-13 -3,-14 Q1,-12 3,-9 Z" fill="#b0d8c8" opacity="0.65" />' +
-      '<path d="M12,5 Q8,12 10,13 Q14,10 14,6 Z" fill="#b0d8c8" opacity="0.5" />' +
-      '<path d="M12,-5 Q8,-11 10,-12 Q14,-9 14,-6 Z" fill="#b0d8c8" opacity="0.5" />' +
-      '<path d="M22,-1 Q8,-8 -6,-9 Q-20,-5 -28,-1 Q-20,4 -6,8 Q8,7 22,1 Q14,0 22,-1 Z" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="0.8" />' +
-      '<ellipse cx="2" cy="-2" rx="8" ry="3.5" fill="rgba(255,255,255,0.28)" transform="rotate(-3 2 -2)" />' +
-      '<path d="M-18,-0.5 Q-2,-2.5 16,-0.5" stroke="rgba(255,255,255,0.2)" stroke-width="0.5" fill="none" />' +
-    '</g>' +
-  '</svg>';
+// 斑纹平移：跟随体轴中段（u≈0.5）的行波，避免纹样从体廓里飘出去
+function koiMarkKF(name, o) {
+  var N = o.samples, css = '@keyframes ' + name + '{';
+  for (var i = 0; i <= N; i++) {
+    css += pct(i / N) + '%{transform:translate(0,' + kn(koiWave(o.markU, i / N, o)) + 'px)}';
+  }
+  return css + '}';
 }
 
-function koiDarkSVG() {
-  return '<svg viewBox="0 0 80 40" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%">' +
-    '<defs>' +
-      '<linearGradient id="koiDarkBody" x1="0%" y1="0%" x2="100%" y2="20%">' +
-        '<stop offset="0%" stop-color="#e0d0e8" />' +
-        '<stop offset="50%" stop-color="#c0b0d0" />' +
-        '<stop offset="100%" stop-color="#a090b8" />' +
-      '</linearGradient>' +
-    '</defs>' +
-    '<g transform="translate(40,20)">' +
-      '<path d="M22,-1 Q8,-8 -6,-9 Q-20,-5 -28,-1 Q-20,4 -6,8 Q8,7 22,1 Q14,0 22,-1 Z" fill="url(#koiDarkBody)" />' +
-      '<path d="M-26,-1 C-30,-4 -38,-11 -45,-9 C-38,-5 -31,-2 -26,-1 Z" fill="#c0b0d0" opacity="0.7" />' +
-      '<path d="M-26,-1 C-30,2 -38,9 -45,7 C-38,4 -31,1 -26,-1 Z" fill="#c0b0d0" opacity="0.65" />' +
-      '<path d="M-26,-1 Q-35,-6 -45,-9" stroke="rgba(255,255,255,0.18)" stroke-width="0.5" fill="none" />' +
-      '<path d="M-26,-1 Q-35,4 -45,7" stroke="rgba(255,255,255,0.18)" stroke-width="0.5" fill="none" />' +
-      '<path d="M-2,-8.5 Q-6,-13 -3,-14 Q1,-12 3,-9 Z" fill="#c8b8d8" opacity="0.65" />' +
-      '<path d="M12,5 Q8,12 10,13 Q14,10 14,6 Z" fill="#c8b8d8" opacity="0.5" />' +
-      '<path d="M12,-5 Q8,-11 10,-12 Q14,-9 14,-6 Z" fill="#c8b8d8" opacity="0.5" />' +
-      '<path d="M22,-1 Q8,-8 -6,-9 Q-20,-5 -28,-1 Q-20,4 -6,8 Q8,7 22,1 Q14,0 22,-1 Z" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="0.8" />' +
-      '<ellipse cx="2" cy="2" rx="7" ry="3" fill="rgba(255,255,255,0.22)" transform="rotate(2 2 2)" />' +
-      '<path d="M-18,-0.5 Q-2,-2.5 16,-0.5" stroke="rgba(255,255,255,0.15)" stroke-width="0.5" fill="none" />' +
-    '</g>' +
-  '</svg>';
+// 关键帧百分比：0/100 不带小数，其余保留一位
+function pct(f) {
+  var pc = Math.round(f * 1000) / 10;
+  return pc === 0 || pc === 100 ? String(pc) : pc.toFixed(1);
+}
+
+// 体轴 x 反查（koiUAt 的逆，供尾柄切向角计算）
+function koiXAt(u, prof) {
+  var f = u * (prof.length - 1), i = Math.min(prof.length - 2, Math.floor(f));
+  return prof[i][0] + (prof[i + 1][0] - prof[i][0]) * (f - i);
+}
+
+// 体廓行波关键帧：每拍采样 samples 帧
+function koiWaveKF(name, o) {
+  var css = '@keyframes ' + name + '{';
+  for (var i = 0; i <= o.samples; i++) {
+    css += pct(i / o.samples) + '%{d:path("' + koiFleshD(i / o.samples, o) + '")}';
+  }
+  return css + '}';
+}
+
+// 尾鳍关键帧：平移贴合尾柄侧移（不脱节）+ 绕尾柄旋转（相位再滞后 → 拖尾感）
+function koiTailKF(name, o) {
+  var pr = o.prof, u0 = 0.86, x0 = koiXAt(u0, pr), x1 = pr[pr.length - 1][0];
+  var css = '@keyframes ' + name + '{';
+  for (var i = 0; i <= o.samples; i++) {
+    var p = i / o.samples, lag = p - o.tailLag;
+    var ang = Math.atan2(koiWave(1, lag, o) - koiWave(u0, lag, o), x1 - x0) * 180 / Math.PI - 180;
+    css += pct(p) + '%{transform:translate(0,' + kn(koiWave(1, p, o)) + 'px) ' +
+      'translate(-27px,0) rotate(' + kn(ang) + 'deg) translate(27px,0)}';
+  }
+  return css + '}';
+}
+
+/* ═══ A 轨迹层 ═══
+   Catmull-Rom 控制点 → 三次贝塞尔（路径串与取点共用，保证一致）
+   时间→弧长：u(τ)=τ−a·sin(2πnτ)/(2πn)，du/dτ=1−a·cos ∈ [1−a,1+a] 恒正不倒退；
+   a 越大「一冲一滑」对比越强。offset-distance 走弧长百分比，浏览器按真实
+   切线定向，故姿态天然贴合轨迹，且密采样只用于编码速度、不存在折线抄近道。 */
+function koiCR(p0, p1, p2, p3) {
+  return [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6,
+    p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+}
+
+function koiBez(p1, c, p2, t) {
+  var k = 1 - t, a = k * k * k, b = 3 * k * k * t, e = 3 * k * t * t, f = t * t * t;
+  return [a * p1[0] + b * c[0] + e * c[2] + f * p2[0], a * p1[1] + b * c[1] + e * c[3] + f * p2[1]];
+}
+
+function koiTrack(o) {
+  var cp = [], i, k;
+  for (i = 0; i < o.pts.length; i++) cp.push([o.pts[i][0] * 4.8, o.pts[i][1] * 4.8]);
+  var n = cp.length, segs = [], last = cp[n - 1];
+  for (i = 0; i < n - 1; i++) {
+    var p0 = cp[i - 1] || cp[i], p2 = cp[i + 1], p3 = cp[i + 2] || cp[i + 1];
+    segs.push({ p1: cp[i], p2: p2, c: koiCR(p0, cp[i], p2, p3) });
+  }
+  // 路径串：M + C 段（稀疏但精确）
+  var s = 'M' + kn(cp[0][0]) + ' ' + kn(cp[0][1]);
+  for (i = 0; i < segs.length; i++) {
+    s += 'C' + kn(segs[i].c[0]) + ' ' + kn(segs[i].c[1]) + ' ' + kn(segs[i].c[2]) + ' ' +
+      kn(segs[i].c[3]) + ' ' + kn(segs[i].p2[0]) + ' ' + kn(segs[i].p2[1]);
+  }
+  o.pathStr = s;
+  // 密集点 + 累积弧长：用于按弧长比例取点（深度/淡入淡出曲线）
+  var dense = [cp[0]], acc = [0];
+  for (i = 0; i < segs.length; i++) {
+    for (k = 1; k <= 14; k++) dense.push(koiBez(segs[i].p1, segs[i].c, segs[i].p2, k / 14));
+  }
+  for (i = 1; i < dense.length; i++) {
+    var dx = dense[i][0] - dense[i - 1][0], dy = dense[i][1] - dense[i - 1][1];
+    acc[i] = acc[i - 1] + Math.sqrt(dx * dx + dy * dy);
+  }
+  var total = acc[acc.length - 1];
+  o.atFrac = function (f) {
+    var target = Math.max(0, Math.min(1, f)) * total, lo = 0, hi = acc.length - 1, mid;
+    while (lo < hi - 1) { mid = (lo + hi) >> 1; if (acc[mid] <= target) lo = mid; else hi = mid; }
+    var span = acc[hi] - acc[lo] || 1, r = (target - acc[lo]) / span;
+    return [dense[lo][0] + (dense[hi][0] - dense[lo][0]) * r, dense[lo][1] + (dense[hi][1] - dense[lo][1]) * r];
+  };
+  return last && o;
+}
+
+// 巡航关键帧：只编码「弧长进度 + 深度缩放 + 透明度」，朝向交给 offset-rotate
+function koiSwimKF(o) {
+  var N = o.track, css = '@keyframes ' + o.anim + '{', i, t, u, pt, dep, sc, op, ramp, props;
+  var sgn = o.mirror ? 'scaleX(-1) ' : '';
+  for (i = 0; i <= N; i++) {
+    t = i / N;
+    u = t - o.burstA * Math.sin(2 * Math.PI * o.burstN * t) / (2 * Math.PI * o.burstN);
+    pt = o.atFrac(u);
+    dep = Math.max(0, Math.min(1, pt[1] / 480));      // 画面下方的鱼更近 → 更大更实
+    ramp = t < 0.05 ? t / 0.05 : (t > 0.94 ? (1 - t) / 0.06 : 1);
+    sc = 0.9 + 0.24 * dep;
+    op = o.op * Math.max(0, ramp) * (0.8 + 0.4 * dep);
+    props = ['offset-distance:' + (u * 100).toFixed(2) + '%'];
+    if (i % 4 === 0 || i === N) props.push('transform:' + sgn + 'scale(' + sc.toFixed(3).replace(/^0/, '') + ')');
+    if (i % 2 === 0 || i === N) props.push('opacity:' + op.toFixed(3).replace(/^0\./, '.'));
+    css += pct(t) + '%{' + props.join(';') + '}';
+  }
+  return css + '}';
+}
+
+// 四条鱼：体型/速度/摆尾/姿态各异。pts 为画面百分比，命中点=鱼身几何中心
+function koiSpecs() {
+  var prof = koiProfile();
+  /* 背鳍：低矮后掠的圆钝叶形（原来偏高，读起来像「背包」）；基部沉入体背内侧防脱缝 */
+  var fin = [[1.4, -7.6], [-0.8, -9.6], [-3, -11], [-5.4, -11], [-7.4, -9.6], [-9, -7.6]];
+  var base = { prof: prof, fin: fin, vb: '-52 -23 80 46', lam: 0.8, samples: 10,
+    markU: 0.5, tailLag: 0.12, track: 40, cls: '', anim: '' };
+  var raw = [
+    { id: 'red', cls: 'lh-koi', anim: 'lh-koi-swim', w: 42, z: 3, lap: 26, beat: 1.35,
+      amp: 3.4, phi: 0.6, op: 0.95, delay: 0, burstA: 0.72, burstN: 2,
+      filter: 'drop-shadow(0 2px 6px rgba(180,30,30,0.16)) drop-shadow(0 0 .5px rgba(255,255,255,0.4)) blur(0.45px)',
+      pts: [[-12, 98], [0, 74], [7, 50], [12, 37], [22, 30], [36, 34], [50, 39], [63, 33], [76, 22], [88, 12], [104, 3]] },
+    /* 白鲤：右上 → 左下，镜像游动，故用 offset-rotate:auto 180deg + scaleX(-1) 保持腹部朝下 */
+    { id: 'white', cls: 'lh-koi-white', anim: 'lh-koi2-swim', w: 37, z: 3, lap: 28, beat: 1.75,
+      amp: 2.7, phi: 1.4, op: 0.9, delay: 8, burstA: 0.6, burstN: 2, mirror: true,
+      filter: 'drop-shadow(0 2px 6px rgba(180,140,50,0.13)) drop-shadow(0 0 .5px rgba(255,255,255,0.35)) blur(0.4px)',
+      pts: [[106, 6], [92, 16], [76, 26], [60, 36], [44, 47], [28, 58], [14, 70], [2, 82], [-10, 94]] },
+    /* 银鲤：近水平慢漂，摆尾极缓，姿态克制 */
+    { id: 'silver', cls: 'lh-koi-silver', anim: 'lh-koi3-swim', w: 36, z: 2, lap: 32, beat: 3,
+      amp: 1.6, phi: 2.2, op: 0.78, delay: 14, burstA: 0.45, burstN: 1,
+      filter: 'drop-shadow(0 2px 5px rgba(140,190,160,0.12)) blur(0.35px)',
+      pts: [[-10, 44], [8, 40], [26, 43], [44, 38], [62, 42], [80, 39], [96, 41], [108, 40]] },
+    /* 玄鲤：之字形探索，急冲急转 + 高频摆尾 */
+    { id: 'dark', cls: 'lh-koi-dark', anim: 'lh-koi4-swim', w: 39, z: 2, lap: 24, beat: 1.05,
+      amp: 3.1, phi: 0.2, op: 0.72, delay: 20, burstA: 0.6, burstN: 4,
+      filter: 'drop-shadow(0 2px 4px rgba(180,160,200,0.1)) blur(0.35px)',
+      pts: [[-10, 10], [4, 13], [14, 11], [24, 30], [33, 44], [42, 26], [50, 22], [60, 44], [70, 58], [82, 62], [94, 68], [106, 72]] }
+  ];
+  var out = [], i, j, o;
+  for (i = 0; i < raw.length; i++) {
+    o = {};
+    for (j in base) o[j] = base[j];
+    for (j in raw[i]) o[j] = raw[i][j];
+    koiTrack(o);
+    out.push(o);
+  }
+  return out;
+}
+
+/* ═══ 装配：CSS 与 DOM 一次性生成（同一份 spec，避免两处参数漂移） ═══ */
+function koiFishCSS(o) {
+  var c = '.' + o.cls, id = o.id, h = (o.w * 46 / 80).toFixed(1);
+  var css = c + '{position:absolute;left:0;top:0;width:' + o.w + 'px;height:' + h + 'px;z-index:' + o.z + ';' +
+    'offset-path:path("' + o.pathStr + '");offset-rotate:auto' + (o.mirror ? ' 180deg' : '') + ';' +
+    'opacity:' + o.op + ';will-change:offset-distance;' +
+    'animation:' + o.anim + ' ' + o.lap + 's linear infinite;animation-delay:' + o.delay + 's;' +
+    'filter:' + o.filter + '}' + koiSwimKF(o);
+  css += c + ' svg g{transform-origin:0 0}';
+  /* 底色层与体量层共用同一份 d 关键帧：一层承担体色、一层承担明暗 */
+  css += c + ' svg .kh-f' + id + ',' + c + ' svg .kh-v' + id + '{animation:khw' + id + ' ' + o.beat + 's linear infinite}' +
+    koiWaveKF('khw' + id, o);
+  css += c + ' svg .kh-t' + id + '{animation:kht' + id + ' ' + o.beat + 's linear infinite}' + koiTailKF('kht' + id, o);
+  var pb = (o.beat * 0.72).toFixed(2);
+  css += c + ' svg .kh-p1' + id + '{animation:khpa' + id + ' ' + pb + 's ease-in-out infinite}' + koiPectKF('khpa' + id, o, -1);
+  css += c + ' svg .kh-p2' + id + '{animation:khpb' + id + ' ' + pb + 's ease-in-out infinite}' + koiPectKF('khpb' + id, o, 1);
+  css += c + ' svg .kh-m' + id + '{animation:khm' + id + ' ' + o.beat + 's linear infinite}' + koiMarkKF('khm' + id, o);
+  return css;
+}
+
+function koiScene() {
+  var P = koiPalettes(), S = koiSpecs(), css = '', html = '', i;
+  for (i = 0; i < S.length; i++) {
+    css += koiFishCSS(S[i]);
+    html += '<div class="' + S[i].cls + '">' + koiSVG(S[i].id, P[S[i].id], S[i]) + '</div>';
+  }
+  return { css: css, html: html };
 }
 
 var theme = {
@@ -256,6 +523,8 @@ var theme = {
   design: { w: 480, h: 480 },
 
   render: function () {
+    // 四条鱼的 CSS（体廓行波/尾鳍/胸鳍/巡航轨迹）与 DOM 由同一份模型生成
+    var K = koiScene();
     var particles = '';
     var pPos = [
       ['30%', '0s', '12s'], ['55%', '-5s', '14s'], ['72%', '-2s', '11s']
@@ -454,11 +723,8 @@ var theme = {
 
     '@keyframes lh-bob{0%{transform:translateY(0) rotate(-2deg)}100%{transform:translateY(-3px) rotate(2deg)}}' +
 
-    '.lh-koi{position:absolute;width:clamp(42px,6%,80px);height:clamp(21px,3%,39px);z-index:3;' +
-      'left:-8%;top:88%;' +
-      'animation:lh-koi-swim 28s ease-in-out infinite;' +
-      'filter:drop-shadow(0 2px 6px rgba(180,30,30,0.15)) blur(0.5px)}' +
-    '.lh-koi svg{animation:lh-koi-wiggle-red 5s ease-in-out infinite;transform-origin:center center}' +
+    /* 四条鱼的运动学 CSS（体廓行波 / 尾鳍 / 胸鳍 / 巡航轨迹）全部由模型生成 */
+    K.css +
     '.lh-koi::after{content:"";position:absolute;left:0;top:50%;width:140%;height:50%;pointer-events:none;z-index:-1;' +
       'background:radial-gradient(ellipse at 85% center,rgba(200,85,55,0.2) 0%,rgba(200,110,70,0.05) 40%,transparent 75%);' +
       'border-radius:50%;transform:translate(-55%,-50%);' +
@@ -467,42 +733,6 @@ var theme = {
       '35%{opacity:0.85;transform:translate(-58%,-52%) scaleX(1.05)}' +
       '70%{opacity:0.55;transform:translate(-52%,-48%) scaleX(0.95)}}' +
 
-    /* 红鲤 LS弧线：底左垂直爬升→右转→S弯游上右，深度 scale 0.95→1.08→0.92 */
-    '@keyframes lh-koi-swim{' +
-      '0%{left:-8%;top:92%;opacity:0;transform:rotate(-85deg) scale(0.95)}' +
-      '5%{opacity:0.65;transform:rotate(-80deg) scale(0.97)}' +
-      '14%{left:3%;top:64%;transform:rotate(-75deg) scale(1.0)}' +
-      '24%{left:6%;top:42%;transform:rotate(-60deg) scale(1.05)}' +
-      '30%{left:8%;top:40%;transform:rotate(-30deg) scale(1.08)}' +
-      '36%{left:14%;top:38%;transform:rotate(-8deg) scale(1.08)}' +
-      '46%{left:30%;top:32%;transform:rotate(-6deg) scale(1.04)}' +
-      '56%{left:48%;top:40%;transform:rotate(-3deg) scale(1.0)}' +
-      '68%{left:66%;top:28%;transform:rotate(-5deg) scale(0.96)}' +
-      '80%{left:84%;top:16%;transform:rotate(-3deg) scale(0.93)}' +
-      '92%{left:98%;top:8%;opacity:0.65;transform:rotate(-2deg) scale(0.92)}' +
-      '100%{left:105%;top:6%;opacity:0;transform:rotate(-2deg) scale(0.92)}}' +
-
-    /* 红鲤身体波浪：慢宽，非对称——发力慢回弹快，skewY 大弧形弯曲 */
-    '@keyframes lh-koi-wiggle-red{' +
-      '0%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-      '14%{transform:rotate(5deg) scaleX(0.87) skewY(-3deg)}' +
-      '22%{transform:rotate(1deg) scaleX(0.98) skewY(-0.5deg)}' +
-      '30%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-      '42%{transform:rotate(-5deg) scaleX(1.08) skewY(3deg)}' +
-      '50%{transform:rotate(-1deg) scaleX(1.02) skewY(0.5deg)}' +
-      '58%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-      '72%{transform:rotate(4deg) scaleX(0.9) skewY(-2.5deg)}' +
-      '80%{transform:rotate(1deg) scaleX(0.98) skewY(-0.5deg)}' +
-      '88%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-      '100%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-    '}' +
-
-    /* 白鲤：从右上追踪红鲤 → 中段绕圈超车 → 继续游向左下 */
-    '.lh-koi-white{position:absolute;width:clamp(37px,5%,73px);height:clamp(19px,2.5%,34px);z-index:3;' +
-      'left:105%;top:14%;transform:scaleX(-1);' +
-      'animation:lh-koi2-swim 28s ease-in-out infinite;animation-delay:8s;' +
-      'filter:drop-shadow(0 2px 6px rgba(180,140,50,0.12)) blur(0.4px)}' +
-    '.lh-koi-white svg{animation:lh-koi-wiggle-white 1.8s ease-in-out infinite;transform-origin:center center}' +
     '.lh-koi-white::after{content:"";position:absolute;left:0;top:50%;width:100%;height:35%;pointer-events:none;z-index:-1;' +
       'background:radial-gradient(ellipse at 85% center,rgba(240,195,70,0.18) 0%,rgba(240,220,120,0.04) 40%,transparent 75%);' +
       'border-radius:50%;transform:translate(-50%,-50%);' +
@@ -512,73 +742,12 @@ var theme = {
       '50%{opacity:0.4;transform:translate(-48%,-50%) scaleX(0.95)}' +
       '75%{opacity:0.7;transform:translate(-51%,-50%) scaleX(1.0)}}' +
 
-    /* 白鲤路径：从右上到左下的流畅弧线，始终面朝左下方 */
-    '@keyframes lh-koi2-swim{' +
-      '0%{left:105%;top:8%;opacity:0;transform:scaleX(-1) rotate(20deg)}' +
-      '5%{opacity:0.5;transform:scaleX(-1) rotate(20deg)}' +
-      '18%{left:78%;top:22%;transform:scaleX(-1) rotate(25deg)}' +
-      '36%{left:52%;top:38%;transform:scaleX(-1) rotate(28deg)}' +
-      '54%{left:30%;top:56%;transform:scaleX(-1) rotate(25deg)}' +
-      '72%{left:10%;top:74%;transform:scaleX(-1) rotate(22deg)}' +
-      '88%{left:-2%;top:86%;opacity:0.5;transform:scaleX(-1) rotate(20deg)}' +
-      '100%{left:-8%;top:92%;opacity:0;transform:scaleX(-1) rotate(20deg)}}' +
-
-    /* 白鲤身体波浪：快紧，非对称 stroke，skewY 模拟身体侧弯 */
-    '@keyframes lh-koi-wiggle-white{' +
-      '0%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-      '12%{transform:rotate(4deg) scaleX(0.88) skewY(-2.5deg)}' +
-      '22%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-      '34%{transform:rotate(-3deg) scaleX(1.06) skewY(2deg)}' +
-      '44%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-      '56%{transform:rotate(4deg) scaleX(0.9) skewY(-2deg)}' +
-      '66%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-      '78%{transform:rotate(-3deg) scaleX(1.04) skewY(1.5deg)}' +
-      '88%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-      '100%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-    '}' +
-
-    /* 银鲤：近乎直线 L→R 水平漂移，微起伏，深度 scale 0.88→1.12→0.88 */
-    '.lh-koi-silver{position:absolute;width:clamp(36px,4.5%,66px);height:clamp(17px,2.2%,30px);z-index:2;' +
-      'left:-8%;top:40%;' +
-      'animation:lh-koi3-swim 32s ease-in-out infinite;animation-delay:14s;' +
-      'filter:drop-shadow(0 2px 5px rgba(140,190,160,0.12));opacity:0.65}' +
-    '.lh-koi-silver svg{animation:lh-koi-wiggle-silver 8s ease-in-out infinite;transform-origin:center center}' +
     '.lh-koi-silver::after{content:"";position:absolute;left:0;top:50%;width:180%;height:40%;pointer-events:none;z-index:-1;' +
       'background:radial-gradient(ellipse at 85% center,rgba(160,210,195,0.12) 0%,rgba(180,220,210,0.03) 50%,transparent 80%);' +
       'border-radius:50%;transform:translate(-50%,-50%);' +
       'animation:lh-trail-silver 7s ease-in-out infinite}' +
     '@keyframes lh-trail-silver{0%,100%{opacity:0.25;transform:translate(-50%,-50%)}50%{opacity:0.55;transform:translate(-52%,-48%)}}' +
 
-    '@keyframes lh-koi3-swim{' +
-      '0%{left:-8%;top:40%;opacity:0;transform:rotate(0deg) scale(0.88)}' +
-      '5%{opacity:0.45;transform:rotate(0.2deg) scale(0.9)}' +
-      '18%{left:12%;top:42%;transform:rotate(1deg) scale(0.95)}' +
-      '34%{left:32%;top:38%;transform:rotate(-0.5deg) scale(1.04)}' +
-      '50%{left:52%;top:43%;transform:rotate(0.5deg) scale(1.12)}' +
-      '66%{left:70%;top:37%;transform:rotate(-1deg) scale(1.04)}' +
-      '82%{left:88%;top:41%;transform:rotate(0deg) scale(0.94)}' +
-      '92%{left:100%;top:40%;opacity:0.45;transform:rotate(0deg) scale(0.88)}' +
-      '100%{left:105%;top:40%;opacity:0;transform:rotate(0deg) scale(0.88)}}' +
-
-    /* 银鲤身体波浪：极慢微弯，几乎不动但有生命的起伏 */
-    '@keyframes lh-koi-wiggle-silver{' +
-      '0%{transform:rotate(0deg) scaleX(0.92) skewY(0deg)}' +
-      '20%{transform:rotate(0.6deg) scaleX(0.9) skewY(-1deg)}' +
-      '32%{transform:rotate(0.1deg) scaleX(0.93) skewY(-0.2deg)}' +
-      '45%{transform:rotate(0deg) scaleX(0.94) skewY(0deg)}' +
-      '55%{transform:rotate(-0.4deg) scaleX(0.91) skewY(0.8deg)}' +
-      '65%{transform:rotate(-0.1deg) scaleX(0.93) skewY(0.2deg)}' +
-      '75%{transform:rotate(0deg) scaleX(0.94) skewY(0deg)}' +
-      '88%{transform:rotate(0.5deg) scaleX(0.9) skewY(-0.7deg)}' +
-      '100%{transform:rotate(0deg) scaleX(0.92) skewY(0deg)}' +
-    '}' +
-
-    /* 玄鲤：之字形 3 次急停转向，探索者性格 */
-    '.lh-koi-dark{position:absolute;width:clamp(39px,5%,70px);height:clamp(19px,2.5%,33px);z-index:2;' +
-      'left:-8%;top:14%;' +
-      'animation:lh-koi4-swim 24s ease-in-out infinite;animation-delay:20s;' +
-      'filter:drop-shadow(0 2px 4px rgba(180,160,200,0.1));opacity:0.55}' +
-    '.lh-koi-dark svg{animation:lh-koi-wiggle-dark 2.5s ease-in-out infinite;transform-origin:center center}' +
     '.lh-koi-dark::after{content:"";position:absolute;left:0;top:50%;width:110%;height:45%;pointer-events:none;z-index:-1;' +
       'background:radial-gradient(ellipse at 85% center,rgba(180,155,210,0.15) 0%,rgba(200,180,225,0.03) 40%,transparent 75%);' +
       'border-radius:50%;transform:translate(-45%,-50%);' +
@@ -587,38 +756,6 @@ var theme = {
       '30%{opacity:0.65;transform:translate(-48%,-52%) scaleX(1.04)}' +
       '60%{opacity:0.3;transform:translate(-42%,-48%) scaleX(0.92)}' +
       '80%{opacity:0.55;transform:translate(-46%,-50%) scaleX(0.98)}}' +
-
-    '@keyframes lh-koi4-swim{' +
-      '0%{left:-8%;top:14%;opacity:0;transform:rotate(-5deg)}' +
-      '5%{opacity:0.45;transform:rotate(-5deg)}' +
-      '15%{left:10%;top:12%;transform:rotate(-8deg)}' +
-      '22%{left:16%;top:12%;transform:rotate(-8deg)}' +
-      '30%{left:30%;top:28%;transform:rotate(25deg)}' +
-      '40%{left:38%;top:40%;transform:rotate(25deg)}' +
-      '48%{left:52%;top:30%;transform:rotate(-20deg)}' +
-      '55%{left:58%;top:28%;transform:rotate(-20deg)}' +
-      '64%{left:72%;top:52%;transform:rotate(30deg)}' +
-      '74%{left:84%;top:60%;transform:rotate(30deg)}' +
-      '86%{left:96%;top:66%;transform:rotate(20deg)}' +
-      '92%{left:102%;top:70%;opacity:0.45;transform:rotate(15deg)}' +
-      '100%{left:105%;top:74%;opacity:0;transform:rotate(15deg)}}' +
-
-    /* 玄鲤变速摆尾：急转弯爆冲 + 缓慢恢复，skewY 模拟折身 */
-    '@keyframes lh-koi-wiggle-dark{' +
-      '0%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-      '6%{transform:rotate(5deg) scaleX(0.84) skewY(-3deg)}' +
-      '12%{transform:rotate(2deg) scaleX(0.95) skewY(-1deg)}' +
-      '20%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-      '30%{transform:rotate(-4deg) scaleX(1.07) skewY(2.5deg)}' +
-      '38%{transform:rotate(-1deg) scaleX(1.02) skewY(0.5deg)}' +
-      '46%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-      '60%{transform:rotate(3deg) scaleX(0.92) skewY(-1.5deg)}' +
-      '68%{transform:rotate(0.5deg) scaleX(0.98) skewY(-0.3deg)}' +
-      '76%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-      '88%{transform:rotate(-2deg) scaleX(0.96) skewY(1deg)}' +
-      '94%{transform:rotate(-0.5deg) scaleX(0.99) skewY(0.2deg)}' +
-      '100%{transform:rotate(0deg) scaleX(1) skewY(0deg)}' +
-    '}' +
 
     '/* ═══ 暗色模式 ═══ */' +
     '[data-theme-mode="dark"] .lh-scene{' +
@@ -687,8 +824,14 @@ var theme = {
     '@keyframes lh-ffa{0%,100%{transform:translate(0,0);opacity:0}14%{opacity:0.85;transform:translate(-70px,-50px)}32%{opacity:0.12;transform:translate(40px,20px)}50%{opacity:0.7;transform:translate(-30px,-70px)}66%{opacity:0.1;transform:translate(60px,-15px)}82%{opacity:0.8;transform:translate(-20px,35px)}}' +
     '@keyframes lh-ffb{0%,100%{transform:translate(0,0);opacity:0}12%{opacity:0.7;transform:translate(-50px,35px)}26%{opacity:0.9;transform:translate(45px,-45px)}44%{opacity:0.08;transform:translate(15px,-70px)}60%{opacity:0.75;transform:translate(-60px,-10px)}76%{opacity:0.1;transform:translate(35px,25px)}90%{opacity:0.85;transform:translate(-25px,-40px)}}' +
     '@keyframes lh-ffc{0%,100%{transform:translate(0,0);opacity:0}15%{opacity:0.8;transform:translate(55px,-35px)}30%{opacity:0.1;transform:translate(-35px,-60px)}48%{opacity:0.9;transform:translate(-55px,15px)}64%{opacity:0.12;transform:translate(25px,40px)}80%{opacity:0.7;transform:translate(-45px,-25px)}}' +
+    /* 降低动效：停掉全部动画后，四条鱼会退回各自路径起点（多在画面外），
+       故显式把它们沿路径摆到画面内的位置，静态仍是一幅完整构图 */
     '@media (prefers-reduced-motion: reduce){' +
       '.lh-scene *{animation:none !important}' +
+      '.lh-koi{offset-distance:26%}' +
+      '.lh-koi-white{offset-distance:46%}' +
+      '.lh-koi-silver{offset-distance:54%}' +
+      '.lh-koi-dark{offset-distance:70%}' +
     '}' +
     '</style>' +
 
@@ -710,10 +853,7 @@ var theme = {
       '<div class="lh-firefly" style="left:72%;top:18%;animation:lh-ffa 8s ease-in-out infinite;animation-delay:-3.5s"></div>' +
       '<div class="lh-firefly" style="left:42%;top:82%;animation:lh-ffb 6.5s ease-in-out infinite;animation-delay:-4.5s"></div>' +
       '<div class="lh-firefly" style="left:90%;top:70%;animation:lh-ffc 7s ease-in-out infinite;animation-delay:-2.5s"></div>' +
-      '<div class="lh-koi">' + koiFishSVG() + '</div>' +
-      '<div class="lh-koi-white">' + koiWhiteSVG() + '</div>' +
-      '<div class="lh-koi-silver">' + koiSilverSVG() + '</div>' +
-      '<div class="lh-koi-dark">' + koiDarkSVG() + '</div>' +
+      K.html +
       leaves +
       '<div class="lh-flower">' + lotusFlowerSVG() + '</div>' +
       '<div class="lh-mist lh-mist-2"></div>' +
