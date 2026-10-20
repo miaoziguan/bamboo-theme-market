@@ -38,9 +38,9 @@ function lotusLeafSVG(id, waveAmp1, waveAmp2) {
   return '<svg viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%">' +
     '<defs>' +
       '<radialGradient id="lf' + id + '" cx="42%" cy="36%">' +
-        '<stop offset="0%" stop-color="hsl(var(--accent-hue,150),38%,calc(68% + var(--accent-lightness-offset,0%)))" />' +
-        '<stop offset="55%" stop-color="hsl(var(--accent-hue,150),34%,calc(58% + var(--accent-lightness-offset,0%)))" />' +
-        '<stop offset="100%" stop-color="hsl(var(--accent-hue,150),30%,calc(48% + var(--accent-lightness-offset,0%)))" />' +
+        '<stop offset="0%" stop-color="hsl(var(--accent-hue,150),min(100%, calc(38% * var(--accent-saturation-scale, 1))),calc(68% + var(--accent-lightness-offset,0%)))" />' +
+        '<stop offset="55%" stop-color="hsl(var(--accent-hue,150),min(100%, calc(34% * var(--accent-saturation-scale, 1))),calc(58% + var(--accent-lightness-offset,0%)))" />' +
+        '<stop offset="100%" stop-color="hsl(var(--accent-hue,150),min(100%, calc(30% * var(--accent-saturation-scale, 1))),calc(48% + var(--accent-lightness-offset,0%)))" />' +
       '</radialGradient>' +
     '</defs>' +
     '<path d="' + pathD + '" fill="url(#lf' + id + ')" />' +
@@ -131,7 +131,7 @@ function waveLayerSVG(id, opacity) {
       d += ' L' + x + ',' + (y + offset).toFixed(1);
     }
     var op = (0.25 - row * 0.04) * opacity;
-    paths += '<path d="' + d + '" stroke="hsla(var(--accent-hue,150),40%,calc(55% + var(--accent-lightness-offset,0%)),' + op.toFixed(3) + ')" stroke-width="0.8" fill="none" />';
+    paths += '<path d="' + d + '" stroke="hsla(var(--accent-hue,150),min(100%, calc(40% * var(--accent-saturation-scale, 1))),calc(55% + var(--accent-lightness-offset,0%)),' + op.toFixed(3) + ')" stroke-width="0.8" fill="none" />';
   }
   return '<svg viewBox="0 0 ' + w + ' 120" preserveAspectRatio="none" style="width:200%;height:100%">' + paths + '</svg>';
 }
@@ -522,6 +522,9 @@ var theme = {
   // 设计画布：正方形基准 480×480（1:1，原 512×320 按 ×0.9375 换算）；尺寸与等比缩放由框架统一处理（无需自行适配）
   design: { w: 480, h: 480 },
 
+  // 标准配色：切到本主题时用于同步全局调色（荷塘竹青，水彩淡雅 96）
+  palette: { hue: 150, lightness: 0, saturation: 96 },
+
   render: function () {
     // 四条鱼的 CSS（体廓行波/尾鳍/胸鳍/巡航轨迹）与 DOM 由同一份模型生成
     var K = koiScene();
@@ -596,13 +599,13 @@ var theme = {
     '.lh-scene{position:absolute;top:0;left:0;width:480px;height:480px;' +
       'border-radius:var(--theme-inner-radius,26px);overflow:hidden;' +
       'background:linear-gradient(175deg,' +
-      'hsl(var(--accent-hue,150),28%,calc(86% + var(--accent-lightness-offset,0%))) 0%,' +
-      'hsl(var(--accent-hue,150),32%,calc(76% + var(--accent-lightness-offset,0%))) 55%,' +
-      'hsl(var(--accent-hue,150),34%,calc(68% + var(--accent-lightness-offset,0%))) 100%);}' +
+      'hsl(var(--accent-hue,150),min(100%, calc(28% * var(--accent-saturation-scale, 1))),calc(86% + var(--accent-lightness-offset,0%))) 0%,' +
+      'hsl(var(--accent-hue,150),min(100%, calc(32% * var(--accent-saturation-scale, 1))),calc(76% + var(--accent-lightness-offset,0%))) 55%,' +
+      'hsl(var(--accent-hue,150),min(100%, calc(34% * var(--accent-saturation-scale, 1))),calc(68% + var(--accent-lightness-offset,0%))) 100%);}' +
 
     '.lh-water{position:absolute;inset:0;background:' +
-      'radial-gradient(ellipse at 30% 70%,hsla(var(--accent-hue,150),45%,calc(60% + var(--accent-lightness-offset,0%)),0.25) 0%,transparent 50%),' +
-      'radial-gradient(ellipse at 72% 35%,hsla(var(--accent-hue,150),42%,calc(55% + var(--accent-lightness-offset,0%)),0.18) 0%,transparent 45%);' +
+      'radial-gradient(ellipse at 30% 70%,hsla(var(--accent-hue,150),min(100%, calc(45% * var(--accent-saturation-scale, 1))),calc(60% + var(--accent-lightness-offset,0%)),0.25) 0%,transparent 50%),' +
+      'radial-gradient(ellipse at 72% 35%,hsla(var(--accent-hue,150),min(100%, calc(42% * var(--accent-saturation-scale, 1))),calc(55% + var(--accent-lightness-offset,0%)),0.18) 0%,transparent 45%);' +
       'animation:lh-shimmer 8s ease-in-out infinite alternate}' +
 
     '@keyframes lh-shimmer{0%{opacity:0.4;transform:translateX(-5px)}100%{opacity:0.8;transform:translateX(5px)}}' +
@@ -632,11 +635,11 @@ var theme = {
 
     /* 国画布境：疏密有致，虚实相生 */
     '.lh-leaf{position:absolute;transform-origin:center bottom}' +
-    '.lh-leaf svg{display:block;filter:drop-shadow(0 3px 8px hsla(var(--accent-hue,150),45%,25%,0.12))}' +
+    '.lh-leaf svg{display:block;filter:drop-shadow(0 3px 8px hsla(var(--accent-hue,150),min(100%, calc(45% * var(--accent-saturation-scale, 1))),25%,0.12))}' +
     /* 主叶：清晰 */
-    '.lh-leaf-1 svg{filter:drop-shadow(0 3px 8px hsla(var(--accent-hue,150),45%,25%,0.12)) blur(0.6px)}' +
+    '.lh-leaf-1 svg{filter:drop-shadow(0 3px 8px hsla(var(--accent-hue,150),min(100%, calc(45% * var(--accent-saturation-scale, 1))),25%,0.12)) blur(0.6px)}' +
     /* 对角呼应：微虚 */
-    '.lh-leaf-5 svg{filter:drop-shadow(0 3px 8px hsla(var(--accent-hue,150),45%,25%,0.09)) blur(0.6px)}' +
+    '.lh-leaf-5 svg{filter:drop-shadow(0 3px 8px hsla(var(--accent-hue,150),min(100%, calc(45% * var(--accent-saturation-scale, 1))),25%,0.09)) blur(0.6px)}' +
 
     /* 主叶 — 左上角撑出画面，宽度随容器缩放 */
     '.lh-leaf-1{width:clamp(262px,25%,394px);top:-15%;left:-5%;animation:lh-sway1 7s ease-in-out infinite alternate;z-index:5}' +
@@ -649,9 +652,9 @@ var theme = {
     /* 露珠：静态分布在右下角叶面，微颤晃动 */
     '.lh-dewdrop{position:absolute;width:clamp(7.5px,2%,12.2px);height:clamp(8.4px,2.2%,13.1px);border-radius:50%;' +
       'background:radial-gradient(circle at 32% 28%,rgba(255,255,255,0.95) 0%,rgba(255,255,255,0.18) 20%,rgba(255,255,255,0.02) 55%,' +
-      'hsla(var(--accent-hue,150),40%,50%,0.25) 78%,hsla(var(--accent-hue,150),30%,30%,0.4) 100%);' +
-      'box-shadow:0 1px 2.5px hsla(var(--accent-hue,150),30%,20%,0.22),' +
-      'inset 0 -1px 2px hsla(var(--accent-hue,150),30%,15%,0.18);z-index:7;pointer-events:none;' +
+      'hsla(var(--accent-hue,150),min(100%, calc(40% * var(--accent-saturation-scale, 1))),50%,0.25) 78%,hsla(var(--accent-hue,150),min(100%, calc(30% * var(--accent-saturation-scale, 1))),30%,0.4) 100%);' +
+      'box-shadow:0 1px 2.5px hsla(var(--accent-hue,150),min(100%, calc(30% * var(--accent-saturation-scale, 1))),20%,0.22),' +
+      'inset 0 -1px 2px hsla(var(--accent-hue,150),min(100%, calc(30% * var(--accent-saturation-scale, 1))),15%,0.18);z-index:7;pointer-events:none;' +
       'transform:translate(-50%,-50%);' +
       'animation-duration:3.2s;animation-timing-function:ease-in-out;animation-iteration-count:infinite;animation-direction:alternate}' +
 
@@ -669,9 +672,9 @@ var theme = {
     /* 水珠：左上角叶心形成 → 沿叶脉滑落 → 叶缘脱离 */
     '.lh-dewdrop-slide{position:absolute;left:50%;top:50%;width:11px;height:13px;border-radius:50%;' +
       'background:radial-gradient(circle at 30% 25%,rgba(255,255,255,0.95) 0%,rgba(255,255,255,0.2) 18%,rgba(255,255,255,0.03) 50%,' +
-      'hsla(var(--accent-hue,150),40%,50%,0.25) 75%,hsla(var(--accent-hue,150),30%,30%,0.4) 100%);' +
-      'box-shadow:0 1.5px 3px hsla(var(--accent-hue,150),30%,20%,0.25),' +
-      'inset 0 -1px 2px hsla(var(--accent-hue,150),30%,15%,0.2);z-index:7;pointer-events:none;' +
+      'hsla(var(--accent-hue,150),min(100%, calc(40% * var(--accent-saturation-scale, 1))),50%,0.25) 75%,hsla(var(--accent-hue,150),min(100%, calc(30% * var(--accent-saturation-scale, 1))),30%,0.4) 100%);' +
+      'box-shadow:0 1.5px 3px hsla(var(--accent-hue,150),min(100%, calc(30% * var(--accent-saturation-scale, 1))),20%,0.25),' +
+      'inset 0 -1px 2px hsla(var(--accent-hue,150),min(100%, calc(30% * var(--accent-saturation-scale, 1))),15%,0.2);z-index:7;pointer-events:none;' +
       'animation-duration:6s;animation-timing-function:cubic-bezier(0.4,0,0.2,1);animation-iteration-count:infinite}' +
 
     dewdropKF('lh-drop-v1', 1) +
@@ -680,8 +683,8 @@ var theme = {
 
     /* 水珠滴落涟漪 — 叶缘触及水面瞬间扩散 */
     '.lh-drop-ripple{position:absolute;width:13px;height:13px;border-radius:50%;pointer-events:none;z-index:-1;' +
-      'border:2px solid hsla(var(--accent-hue,150),38%,30%,0.58);' +
-      'box-shadow:0 0 7px hsla(var(--accent-hue,150),38%,28%,0.28);' +
+      'border:2px solid hsla(var(--accent-hue,150),min(100%, calc(38% * var(--accent-saturation-scale, 1))),30%,0.58);' +
+      'box-shadow:0 0 7px hsla(var(--accent-hue,150),min(100%, calc(38% * var(--accent-saturation-scale, 1))),28%,0.28);' +
       'animation:lh-drop-ripple 6s ease-out infinite}' +
     '@keyframes lh-drop-ripple{' +
       '0%,84%{transform:translate(-50%,-50%) scale(0);opacity:0}' +
@@ -690,12 +693,12 @@ var theme = {
 
     /* 涟漪内圈 - 明亮紧实 */
     '.lh-ripple-inner{position:absolute;width:22px;height:22px;margin-left:-11px;margin-top:-11px;border-radius:50%;' +
-      'border:2px solid hsla(var(--accent-hue,150),52%,calc(48% + var(--accent-lightness-offset,0%)),0.4);' +
-      'box-shadow:0 0 6px hsla(var(--accent-hue,150),52%,calc(48% + var(--accent-lightness-offset,0%)),0.1);' +
+      'border:2px solid hsla(var(--accent-hue,150),min(100%, calc(52% * var(--accent-saturation-scale, 1))),calc(48% + var(--accent-lightness-offset,0%)),0.4);' +
+      'box-shadow:0 0 6px hsla(var(--accent-hue,150),min(100%, calc(52% * var(--accent-saturation-scale, 1))),calc(48% + var(--accent-lightness-offset,0%)),0.1);' +
       'animation:lh-ripple-in ease-out infinite}' +
     /* 涟漪外圈 - 淡而扩散 */
     '.lh-ripple-outer{position:absolute;width:22px;height:22px;margin-left:-11px;margin-top:-11px;border-radius:50%;' +
-      'border:1.2px solid hsla(var(--accent-hue,150),52%,calc(48% + var(--accent-lightness-offset,0%)),0.18);' +
+      'border:1.2px solid hsla(var(--accent-hue,150),min(100%, calc(52% * var(--accent-saturation-scale, 1))),calc(48% + var(--accent-lightness-offset,0%)),0.18);' +
       'animation:lh-ripple-out ease-out infinite}' +
 
     '@keyframes lh-ripple-in{' +
@@ -709,7 +712,7 @@ var theme = {
 
 
     '.lh-particle{position:absolute;top:100%;width:4px;height:4px;border-radius:50%;' +
-      'background:hsla(var(--accent-hue,150),45%,72%,0.2);animation:lh-float linear infinite}' +
+      'background:hsla(var(--accent-hue,150),min(100%, calc(45% * var(--accent-saturation-scale, 1))),72%,0.2);animation:lh-float linear infinite}' +
 
     '@keyframes lh-float{' +
       '0%{top:100%;transform:translateX(0);opacity:0}' +
@@ -760,11 +763,11 @@ var theme = {
     '/* ═══ 暗色模式 ═══ */' +
     '[data-theme-mode="dark"] .lh-scene{' +
       'background:radial-gradient(ellipse at 40% 45%,' +
-      'hsl(var(--accent-hue,150),28%,calc(22% + var(--accent-lightness-offset,0%))) 0%,' +
-      'hsl(var(--accent-hue,150),28%,calc(12% + var(--accent-lightness-offset,0%))) 100%)}' +
+      'hsl(var(--accent-hue,150),min(100%, calc(28% * var(--accent-saturation-scale, 1))),calc(22% + var(--accent-lightness-offset,0%))) 0%,' +
+      'hsl(var(--accent-hue,150),min(100%, calc(28% * var(--accent-saturation-scale, 1))),calc(12% + var(--accent-lightness-offset,0%))) 100%)}' +
     '[data-theme-mode="dark"] .lh-water{' +
-      'background:radial-gradient(ellipse at 30% 70%,hsla(var(--accent-hue,150),45%,calc(15% + var(--accent-lightness-offset,0%)),0.12) 0%,transparent 50%),' +
-      'radial-gradient(ellipse at 72% 35%,hsla(var(--accent-hue,150),42%,calc(12% + var(--accent-lightness-offset,0%)),0.08) 0%,transparent 45%)}' +
+      'background:radial-gradient(ellipse at 30% 70%,hsla(var(--accent-hue,150),min(100%, calc(45% * var(--accent-saturation-scale, 1))),calc(15% + var(--accent-lightness-offset,0%)),0.12) 0%,transparent 50%),' +
+      'radial-gradient(ellipse at 72% 35%,hsla(var(--accent-hue,150),min(100%, calc(42% * var(--accent-saturation-scale, 1))),calc(12% + var(--accent-lightness-offset,0%)),0.08) 0%,transparent 45%)}' +
     '[data-theme-mode="dark"] .lh-mist-1,[data-theme-mode="dark"] .lh-mist-2,[data-theme-mode="dark"] .lh-mist-3{display:none}' +
     '[data-theme-mode="dark"] .lh-waves,[data-theme-mode="dark"] .lh-waves-2{display:none}' +
     '[data-theme-mode="dark"] .lh-leaf svg{' +
@@ -775,14 +778,14 @@ var theme = {
       'filter:drop-shadow(0 0 60px hsla(45,40%,55%,0.12)) drop-shadow(0 0 28px hsla(45,50%,55%,0.3)) drop-shadow(0 0 8px hsla(45,40%,72%,0.45)) blur(0.6px) brightness(0.7)}' +
     '[data-theme-mode="dark"] .lh-dewdrop{' +
       'background:radial-gradient(circle at 30% 25%,rgba(255,255,255,0.9) 0%,rgba(255,255,255,0.15) 18%,rgba(255,255,255,0.02) 50%,' +
-      'hsla(var(--accent-hue,150),40%,30%,0.2) 75%,hsla(var(--accent-hue,150),30%,15%,0.35) 100%);' +
-      'box-shadow:0 1.5px 3px hsla(var(--accent-hue,150),30%,10%,0.3),' +
-      'inset 0 -1px 2px hsla(var(--accent-hue,150),30%,8%,0.25)}' +
+      'hsla(var(--accent-hue,150),min(100%, calc(40% * var(--accent-saturation-scale, 1))),30%,0.2) 75%,hsla(var(--accent-hue,150),min(100%, calc(30% * var(--accent-saturation-scale, 1))),15%,0.35) 100%);' +
+      'box-shadow:0 1.5px 3px hsla(var(--accent-hue,150),min(100%, calc(30% * var(--accent-saturation-scale, 1))),10%,0.3),' +
+      'inset 0 -1px 2px hsla(var(--accent-hue,150),min(100%, calc(30% * var(--accent-saturation-scale, 1))),8%,0.25)}' +
     '[data-theme-mode="dark"] .lh-dewdrop-slide{' +
       'background:radial-gradient(circle at 30% 25%,rgba(255,255,255,0.9) 0%,rgba(255,255,255,0.15) 18%,rgba(255,255,255,0.02) 50%,' +
-      'hsla(var(--accent-hue,150),40%,30%,0.2) 75%,hsla(var(--accent-hue,150),30%,15%,0.35) 100%);' +
-      'box-shadow:0 1.5px 3px hsla(var(--accent-hue,150),30%,10%,0.3),' +
-      'inset 0 -1px 2px hsla(var(--accent-hue,150),30%,8%,0.25)}' +
+      'hsla(var(--accent-hue,150),min(100%, calc(40% * var(--accent-saturation-scale, 1))),30%,0.2) 75%,hsla(var(--accent-hue,150),min(100%, calc(30% * var(--accent-saturation-scale, 1))),15%,0.35) 100%);' +
+      'box-shadow:0 1.5px 3px hsla(var(--accent-hue,150),min(100%, calc(30% * var(--accent-saturation-scale, 1))),10%,0.3),' +
+      'inset 0 -1px 2px hsla(var(--accent-hue,150),min(100%, calc(30% * var(--accent-saturation-scale, 1))),8%,0.25)}' +
     '[data-theme-mode="dark"] .lh-ripple-inner{' +
       'border-color:hsla(45,55%,55%,0.5);' +
       'box-shadow:0 0 6px hsla(45,55%,55%,0.18)}' +
@@ -792,7 +795,7 @@ var theme = {
       'border-color:hsla(45,55%,55%,0.5);' +
       'box-shadow:0 0 5px hsla(45,55%,55%,0.22)}' +
     '[data-theme-mode="dark"] .lh-particle{' +
-      'background:hsla(var(--accent-hue,150),45%,25%,0.08)}' +
+      'background:hsla(var(--accent-hue,150),min(100%, calc(45% * var(--accent-saturation-scale, 1))),25%,0.08)}' +
     '[data-theme-mode="dark"] .lh-flower svg{' +
       'filter:drop-shadow(0 0 12px hsla(45,40%,70%,0.35)) drop-shadow(0 0 30px hsla(45,35%,60%,0.15)) blur(1.2px)}' +
     '[data-theme-mode="dark"] .lh-leaf::after{' +
