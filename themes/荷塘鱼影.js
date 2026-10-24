@@ -456,22 +456,22 @@ function koiSpecs() {
   var raw = [
     { id: 'red', cls: 'lh-koi', anim: 'lh-koi-swim', w: 42, z: 3, lap: 26, beat: 1.35,
       amp: 3.4, phi: 0.6, op: 0.95, delay: 0, burstA: 0.72, burstN: 2,
-      filter: 'drop-shadow(0 2px 6px rgba(180,30,30,0.16)) drop-shadow(0 0 .5px rgba(255,255,255,0.4)) blur(0.45px)',
+      filter: 'drop-shadow(0 2px 6px rgba(180,30,30,0.16)) blur(calc(0.45px * var(--fl-blur-scale, 1)))',
       pts: [[-12, 98], [0, 74], [7, 50], [12, 37], [22, 30], [36, 34], [50, 39], [63, 33], [76, 22], [88, 12], [104, 3]] },
     /* 白鲤：右上 → 左下，镜像游动，故用 offset-rotate:auto 180deg + scaleX(-1) 保持腹部朝下 */
     { id: 'white', cls: 'lh-koi-white', anim: 'lh-koi2-swim', w: 37, z: 3, lap: 28, beat: 1.75,
       amp: 2.7, phi: 1.4, op: 0.9, delay: 8, burstA: 0.6, burstN: 2, mirror: true,
-      filter: 'drop-shadow(0 2px 6px rgba(180,140,50,0.13)) drop-shadow(0 0 .5px rgba(255,255,255,0.35)) blur(0.4px)',
+      filter: 'drop-shadow(0 2px 6px rgba(180,140,50,0.13)) blur(calc(0.4px * var(--fl-blur-scale, 1)))',
       pts: [[106, 6], [92, 16], [76, 26], [60, 36], [44, 47], [28, 58], [14, 70], [2, 82], [-10, 94]] },
     /* 银鲤：近水平慢漂，摆尾极缓，姿态克制 */
     { id: 'silver', cls: 'lh-koi-silver', anim: 'lh-koi3-swim', w: 36, z: 2, lap: 32, beat: 3,
       amp: 1.6, phi: 2.2, op: 0.78, delay: 14, burstA: 0.45, burstN: 1,
-      filter: 'drop-shadow(0 2px 5px rgba(140,190,160,0.12)) blur(0.35px)',
+      filter: 'drop-shadow(0 2px 5px rgba(140,190,160,0.12)) blur(calc(0.35px * var(--fl-blur-scale, 1)))',
       pts: [[-10, 44], [8, 40], [26, 43], [44, 38], [62, 42], [80, 39], [96, 41], [108, 40]] },
     /* 玄鲤：之字形探索，急冲急转 + 高频摆尾 */
     { id: 'dark', cls: 'lh-koi-dark', anim: 'lh-koi4-swim', w: 39, z: 2, lap: 24, beat: 1.05,
       amp: 3.1, phi: 0.2, op: 0.72, delay: 20, burstA: 0.6, burstN: 4,
-      filter: 'drop-shadow(0 2px 4px rgba(180,160,200,0.1)) blur(0.35px)',
+      filter: 'drop-shadow(0 2px 4px rgba(180,160,200,0.1)) blur(calc(0.35px * var(--fl-blur-scale, 1)))',
       pts: [[-10, 10], [4, 13], [14, 11], [24, 30], [33, 44], [42, 26], [50, 22], [60, 44], [70, 58], [82, 62], [94, 68], [106, 72]] }
   ];
   var out = [], i, j, o;
@@ -637,9 +637,9 @@ var theme = {
     '.lh-leaf{position:absolute;transform-origin:center bottom}' +
     '.lh-leaf svg{display:block;filter:drop-shadow(0 3px 8px hsla(var(--accent-hue,150),min(100%, calc(45% * var(--accent-saturation-scale, 1))),25%,0.12))}' +
     /* 主叶：清晰 */
-    '.lh-leaf-1 svg{filter:drop-shadow(0 3px 8px hsla(var(--accent-hue,150),min(100%, calc(45% * var(--accent-saturation-scale, 1))),25%,0.12)) blur(0.6px)}' +
+    '.lh-leaf-1 svg{filter:drop-shadow(0 3px 8px hsla(var(--accent-hue,150),min(100%, calc(45% * var(--accent-saturation-scale, 1))),25%,0.12)) blur(calc(0.6px * var(--fl-blur-scale, 1)))}' +
     /* 对角呼应：微虚 */
-    '.lh-leaf-5 svg{filter:drop-shadow(0 3px 8px hsla(var(--accent-hue,150),min(100%, calc(45% * var(--accent-saturation-scale, 1))),25%,0.09)) blur(0.6px)}' +
+    '.lh-leaf-5 svg{filter:drop-shadow(0 3px 8px hsla(var(--accent-hue,150),min(100%, calc(45% * var(--accent-saturation-scale, 1))),25%,0.09)) blur(calc(0.6px * var(--fl-blur-scale, 1)))}' +
 
     /* 主叶 — 左上角撑出画面，宽度随容器缩放 */
     '.lh-leaf-1{width:clamp(262px,25%,394px);top:-15%;left:-5%;animation:lh-sway1 7s ease-in-out infinite alternate;z-index:5}' +
@@ -702,23 +702,23 @@ var theme = {
       'animation:lh-ripple-out ease-out infinite}' +
 
     '@keyframes lh-ripple-in{' +
-      '0%{transform:scale(0.15);opacity:0;border-width:2.5px}' +
+      '0%{transform:scale(0.15);opacity:0}' +
       '10%{opacity:0.55}' +
-      '100%{transform:scale(5);opacity:0;border-width:0.15px}}' +
+      '100%{transform:scale(5);opacity:0}}' +
     '@keyframes lh-ripple-out{' +
-      '0%{transform:scale(0.3);opacity:0;border-width:1.2px}' +
+      '0%{transform:scale(0.3);opacity:0}' +
       '12%{opacity:0.3}' +
-      '100%{transform:scale(9);opacity:0;border-width:0.1px}}' +
+      '100%{transform:scale(9);opacity:0}}' +
 
 
-    '.lh-particle{position:absolute;top:100%;width:4px;height:4px;border-radius:50%;' +
+    '.lh-particle{position:absolute;top:0;width:4px;height:4px;border-radius:50%;' +
       'background:hsla(var(--accent-hue,150),min(100%, calc(45% * var(--accent-saturation-scale, 1))),72%,0.2);animation:lh-float linear infinite}' +
 
     '@keyframes lh-float{' +
-      '0%{top:100%;transform:translateX(0);opacity:0}' +
+      '0%{transform:translate(0,480px);opacity:0}' +
       '8%{opacity:0.3}' +
       '85%{opacity:0.12}' +
-      '100%{top:-10%;transform:translateX(12px);opacity:0}}' +
+      '100%{transform:translate(12px,-48px);opacity:0}}' +
 
     '.lh-flower{position:absolute;bottom:12.5%;left:20%;width:32px;z-index:7;' +
       'animation:lh-bob 5s ease-in-out infinite alternate;opacity:0.78}' +
@@ -773,9 +773,9 @@ var theme = {
     '[data-theme-mode="dark"] .lh-leaf svg{' +
       'filter:drop-shadow(0 0 30px hsla(45,50%,55%,0.35)) drop-shadow(0 0 10px hsla(45,45%,72%,0.5)) brightness(0.7)}' +
     '[data-theme-mode="dark"] .lh-leaf-1 svg{' +
-      'filter:drop-shadow(0 0 80px hsla(45,40%,55%,0.15)) drop-shadow(0 0 45px hsla(45,50%,55%,0.4)) drop-shadow(0 0 16px hsla(45,40%,78%,0.55)) blur(0.6px) brightness(0.7)}' +
+      'filter:drop-shadow(0 0 80px hsla(45,40%,55%,0.15)) drop-shadow(0 0 45px hsla(45,50%,55%,0.4)) drop-shadow(0 0 16px hsla(45,40%,78%,0.55)) blur(calc(0.6px * var(--fl-blur-scale, 1))) brightness(0.7)}' +
     '[data-theme-mode="dark"] .lh-leaf-5 svg{' +
-      'filter:drop-shadow(0 0 60px hsla(45,40%,55%,0.12)) drop-shadow(0 0 28px hsla(45,50%,55%,0.3)) drop-shadow(0 0 8px hsla(45,40%,72%,0.45)) blur(0.6px) brightness(0.7)}' +
+      'filter:drop-shadow(0 0 60px hsla(45,40%,55%,0.12)) drop-shadow(0 0 28px hsla(45,50%,55%,0.3)) drop-shadow(0 0 8px hsla(45,40%,72%,0.45)) blur(calc(0.6px * var(--fl-blur-scale, 1))) brightness(0.7)}' +
     '[data-theme-mode="dark"] .lh-dewdrop{' +
       'background:radial-gradient(circle at 30% 25%,rgba(255,255,255,0.9) 0%,rgba(255,255,255,0.15) 18%,rgba(255,255,255,0.02) 50%,' +
       'hsla(var(--accent-hue,150),min(100%, calc(40% * var(--accent-saturation-scale, 1))),30%,0.2) 75%,hsla(var(--accent-hue,150),min(100%, calc(30% * var(--accent-saturation-scale, 1))),15%,0.35) 100%);' +
@@ -797,7 +797,7 @@ var theme = {
     '[data-theme-mode="dark"] .lh-particle{' +
       'background:hsla(var(--accent-hue,150),min(100%, calc(45% * var(--accent-saturation-scale, 1))),25%,0.08)}' +
     '[data-theme-mode="dark"] .lh-flower svg{' +
-      'filter:drop-shadow(0 0 12px hsla(45,40%,70%,0.35)) drop-shadow(0 0 30px hsla(45,35%,60%,0.15)) blur(1.2px)}' +
+      'filter:drop-shadow(0 0 12px hsla(45,40%,70%,0.35)) drop-shadow(0 0 30px hsla(45,35%,60%,0.15)) blur(calc(1.2px * var(--fl-blur-scale, 1)))}' +
     '[data-theme-mode="dark"] .lh-leaf::after{' +
       'content:"";position:absolute;width:22px;height:22px;left:50%;top:50%;margin:-11px 0 0 -11px;' +
       'border-radius:50%;background:radial-gradient(circle,hsla(45,45%,80%,0.5) 0%,transparent 75%);' +
@@ -836,6 +836,10 @@ var theme = {
       '.lh-koi-silver{offset-distance:54%}' +
       '.lh-koi-dark{offset-distance:70%}' +
     '}' +
+'/* 动效强度：lite=停大面积低感知层+关鱼滤镜；static=再去全场滤镜（框架会暂停动画，但滤镜不会自己消失）*/' +
+'[data-motion="lite"] .lh-water,[data-motion="lite"] .lh-mist-1,[data-motion="lite"] .lh-mist-2,[data-motion="lite"] .lh-mist-3{animation:none}' +
+'[data-motion="lite"] .lh-koi,[data-motion="lite"] .lh-koi-white,[data-motion="lite"] .lh-koi-silver,[data-motion="lite"] .lh-koi-dark{filter:none}' +
+'[data-motion="static"] .lh-scene *{filter:none !important}' +
     '</style>' +
 
     '<div class="lh-scene">' +
